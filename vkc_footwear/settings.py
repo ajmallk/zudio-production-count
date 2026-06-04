@@ -9,7 +9,7 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-vkc-footwear-qr-track
 
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost', cast=Csv())
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', ['https://zudio-production-count.onrender.com'], cast=Csv())
 
 INSTALLED_APPS = [
     'django.contrib.admin',
