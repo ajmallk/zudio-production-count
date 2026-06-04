@@ -1,0 +1,305 @@
+{% extends "tracker/base.html" %}
+{% block title %}New Order — VKC QR Tracker{% endblock %}
+{% block page_title %}<i class="bi bi-plus-circle me-2" style="color:var(--primary);"></i>Create New Order{% endblock %}
+
+{% block extra_head %}
+<style>
+.step-bar {
+  display: flex;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  gap: 0;
+}
+.step { flex:1; text-align:center; position:relative; }
+.step-num {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; font-weight: 700;
+  margin-bottom: 5px;
+}
+.step.active .step-num  { background:var(--primary); color:white; box-shadow:0 3px 10px rgba(79,70,229,0.3); }
+.step.done .step-num    { background:var(--success); color:white; }
+.step.inactive .step-num{ background:#f1f5f9; color:var(--text-muted); border:1px solid var(--border); }
+.step.active  > div:last-child { color:var(--primary); font-weight:600; font-size:0.82rem; }
+.step.done    > div:last-child { color:var(--success); font-weight:600; font-size:0.82rem; }
+.step.inactive> div:last-child { color:var(--text-muted); font-size:0.82rem; }
+
+.size-btn {
+  background: #f8fafc;
+  border: 1.5px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 1.1rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.size-btn:hover, .size-btn.selected {
+  background: var(--primary-light);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.cart-item {
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.8rem 1rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  animation: slideIn 0.25s ease;
+}
+@keyframes slideIn { from{opacity:0;transform:translateX(-8px);}to{opacity:1;transform:translateX(0);} }
+
+.article-chip {
+  background: var(--primary-light);
+  border: 1px solid rgba(79,70,229,0.2);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.9rem;
+}
+
+.ocr-zone {
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.25s;
+  background: #f8fafc;
+}
+.ocr-zone:hover, .ocr-zone.dragover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Step Indicator -->
+<div class="step-bar">
+  <div class="step active">
+    <div><div class="step-num mx-auto">1</div></div>
+    <div>Add Items</div>
+  </div>
+  <div class="step inactive">
+    <div><div class="step-num mx-auto">2</div></div>
+    <div>Review Order</div>
+  </div>
+  <div class="step inactive">
+    <div><div class="step-num mx-auto">3</div></div>
+    <div>Generate QR</div>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <!-- LEFT: Add Items -->
+  <div class="col-lg-7">
+
+    <!-- Manual Entry -->
+    <div class="card-light mb-4">
+      <div class="section-header"><i class="bi bi-pencil-square me-1"></i>Manual Entry</div>
+
+      <div class="mb-3">
+        <label class="form-label">Select Size</label>
+        <div class="d-flex flex-wrap gap-2" id="size-buttons">
+          {% for size in size_choices %}
+          <button type="button" class="size-btn" onclick="selectSize({{ size }})">{{ size }}</button>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div id="article-display" style="display:none;" class="mb-3">
+        <div class="article-chip">
+          <div style="font-size:0.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Auto-filled Article Number</div>
+          <div id="article-value" style="font-size:1rem;font-weight:700;color:var(--primary);font-family:monospace;margin-top:2px;"></div>
+        </div>
+      </div>
+
+      <form method="post" id="add-form" action="{% url 'create_order' %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_item" />
+        <input type="hidden" name="size" id="selected-size" value="" />
+
+        <div class="mb-3">
+          <label class="form-label">Quantity</label>
+          <div class="input-group" style="max-width:240px;">
+            <button type="button" class="btn btn-outline-custom" onclick="adjustQty(-1)" style="border-radius:var(--radius-sm) 0 0 var(--radius-sm);">
+              <i class="bi bi-dash-lg"></i>
+            </button>
+            <input type="number" name="quantity" id="qty-input" class="form-control text-center"
+                   value="1" min="1" max="10000" style="border-radius:0;border-left:0;border-right:0;" />
+            <button type="button" class="btn btn-outline-custom" onclick="adjustQty(1)" style="border-radius:0 var(--radius-sm) var(--radius-sm) 0;">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary-custom w-100" id="add-btn" disabled>
+          <i class="bi bi-plus-circle me-2"></i>Add to Order
+        </button>
+      </form>
+    </div>
+
+    <!-- OCR Upload -->
+    <div class="card-light">
+      <div class="section-header"><i class="bi bi-image me-1"></i>Import from Image (OCR)</div>
+      <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem;">
+        Upload an image containing article number and size text. The system will auto-extract values.
+      </p>
+      <div class="ocr-zone" id="ocr-zone" onclick="document.getElementById('ocr-file').click()">
+        <i class="bi bi-cloud-upload" style="font-size:2.5rem;color:var(--primary);opacity:0.6;"></i>
+        <p style="color:var(--text-muted);margin-top:0.5rem;font-size:0.85rem;margin-bottom:0;">Click or drag & drop an image here</p>
+        <input type="file" id="ocr-file" accept="image/*" style="display:none;" onchange="handleOCR(this)" />
+      </div>
+      <div id="ocr-result" style="display:none;" class="mt-3"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Cart -->
+  <div class="col-lg-5">
+    <div class="card-light" style="position:sticky;top:80px;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="section-header mb-0"><i class="bi bi-cart3 me-1"></i>Order Cart</div>
+        {% if cart %}
+        <form method="post" style="margin:0;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="clear_cart" />
+          <button type="submit" class="btn btn-sm btn-outline-custom py-1"
+                  onclick="return confirm('Clear all items?')" style="color:var(--danger);border-color:#fca5a5;">
+            <i class="bi bi-trash3 me-1"></i>Clear
+          </button>
+        </form>
+        {% endif %}
+      </div>
+
+      {% if cart %}
+        {% for item in cart %}
+        <div class="cart-item">
+          <div>
+            <div style="font-size:1rem;font-weight:700;color:var(--text-primary);">Size {{ item.size }}</div>
+            <div style="font-size:0.72rem;color:var(--text-muted);font-family:monospace;">{{ item.article }}</div>
+          </div>
+          <div class="d-flex align-items-center gap-3">
+            <div style="text-align:right;">
+              <div style="font-size:1.2rem;font-weight:700;color:var(--primary);">× {{ item.quantity }}</div>
+              <div style="font-size:0.68rem;color:var(--text-muted);">units</div>
+            </div>
+            <form method="post" style="margin:0;">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="remove_item" />
+              <input type="hidden" name="size" value="{{ item.size }}" />
+              <button type="submit" class="btn btn-sm"
+                      style="background:var(--danger-light);border:1px solid #fca5a5;color:var(--danger);border-radius:var(--radius-sm);padding:0.3rem 0.6rem;">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+
+        <div style="border-top:1px solid var(--border);margin-top:1rem;padding-top:1rem;">
+          <div class="d-flex justify-content-between mb-1">
+            <span style="color:var(--text-muted);font-size:0.85rem;">Total Sizes:</span>
+            <span style="font-weight:700;color:var(--text-primary);">{{ cart|length }}</span>
+          </div>
+          <div class="d-flex justify-content-between mb-3">
+            <span style="color:var(--text-muted);font-size:0.85rem;">Total QR Codes:</span>
+            <span style="font-size:1.2rem;font-weight:800;color:var(--primary);">{{ total_qty }}</span>
+          </div>
+          <a href="{% url 'review_order' %}" class="btn btn-accent w-100 btn-lg">
+            <i class="bi bi-arrow-right-circle me-2"></i>Review & Generate QR
+          </a>
+        </div>
+      {% else %}
+        <div class="text-center py-4" style="color:var(--text-muted);">
+          <i class="bi bi-cart" style="font-size:3rem;opacity:0.2;"></i>
+          <p style="font-size:0.85rem;margin-top:0.75rem;">Add sizes to start your order</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const articleMap = {{ article_map_json|safe }};
+let selectedSize = null;
+
+function selectSize(size) {
+  selectedSize = size;
+  document.getElementById('selected-size').value = size;
+  document.getElementById('article-value').textContent = articleMap[size] || 'N/A';
+  document.getElementById('article-display').style.display = 'block';
+  document.getElementById('add-btn').disabled = false;
+  document.querySelectorAll('.size-btn').forEach(b => {
+    b.classList.toggle('selected', b.textContent.trim() == size);
+  });
+}
+
+function adjustQty(delta) {
+  const input = document.getElementById('qty-input');
+  const val = parseInt(input.value) || 1;
+  input.value = Math.max(1, Math.min(10000, val + delta));
+}
+
+function handleOCR(input) {
+  if (!input.files || !input.files[0]) return;
+  const formData = new FormData();
+  formData.append('image', input.files[0]);
+  formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+  const resultDiv = document.getElementById('ocr-result');
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = '<div class="text-center" style="color:var(--text-muted);padding:1rem;"><div class="spinner-border spinner-border-sm me-2" style="color:var(--primary);"></div>Scanning image with OCR...</div>';
+
+  fetch('{% url "ocr_upload" %}', { method: 'POST', body: formData })
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) {
+        resultDiv.innerHTML = `
+          <div style="background:var(--success-light);border:1px solid #6ee7b7;border-radius:var(--radius-md);padding:1rem;">
+            <div style="color:var(--success);font-weight:600;margin-bottom:0.5rem;"><i class="bi bi-check-circle me-1"></i>Extracted Successfully!</div>
+            <div style="font-size:0.85rem;color:var(--text-primary);">Article: <strong>${d.article}</strong></div>
+            <div style="font-size:0.85rem;color:var(--text-primary);">Size: <strong>${d.size}</strong></div>
+            <button class="btn btn-sm mt-2 btn-primary-custom" onclick="selectSize(${d.size})">
+              <i class="bi bi-arrow-right me-1"></i>Use This Size
+            </button>
+          </div>`;
+      } else {
+        resultDiv.innerHTML = `
+          <div style="background:var(--danger-light);border:1px solid #fca5a5;border-radius:var(--radius-md);padding:1rem;color:var(--danger);">
+            <i class="bi bi-exclamation-triangle me-1"></i>${d.error}
+          </div>`;
+      }
+    }).catch(() => {
+      resultDiv.innerHTML = '<div style="background:var(--warning-light);border:1px solid #fcd34d;border-radius:var(--radius-md);padding:0.75rem;color:var(--warning);">OCR service error. Please enter manually.</div>';
+    });
+}
+
+const ocrZone = document.getElementById('ocr-zone');
+ocrZone.addEventListener('dragover', e => { e.preventDefault(); ocrZone.classList.add('dragover'); });
+ocrZone.addEventListener('dragleave', () => ocrZone.classList.remove('dragover'));
+ocrZone.addEventListener('drop', e => {
+  e.preventDefault();
+  ocrZone.classList.remove('dragover');
+  const files = e.dataTransfer.files;
+  if (files[0]) {
+    const dt = new DataTransfer();
+    dt.items.add(files[0]);
+    document.getElementById('ocr-file').files = dt.files;
+    handleOCR(document.getElementById('ocr-file'));
+  }
+});
+</script>
+{% endblock %}

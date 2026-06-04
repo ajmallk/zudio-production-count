@@ -1,0 +1,539 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}VKC Footwear QR Tracker{% endblock %}</title>
+  <meta name="description" content="VKC Fortune Elastomers - Footwear Production & QR Stock Tracking System" />
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --primary:        #4f46e5;
+      --primary-dark:   #3730a3;
+      --primary-light:  #ede9fe;
+      --primary-mid:    rgba(79,70,229,0.12);
+      --accent:         #e11d48;
+      --accent-light:   #fff1f2;
+      --success:        #059669;
+      --success-light:  #d1fae5;
+      --warning:        #d97706;
+      --warning-light:  #fef3c7;
+      --danger:         #dc2626;
+      --danger-light:   #fee2e2;
+      --info:           #0284c7;
+      --info-light:     #e0f2fe;
+
+      --bg-body:        #f1f5f9;
+      --bg-card:        #ffffff;
+      --bg-sidebar:     #ffffff;
+      --bg-topbar:      rgba(255,255,255,0.92);
+
+      --border:         #e2e8f0;
+      --border-strong:  #cbd5e1;
+
+      --text-primary:   #1e293b;
+      --text-secondary: #475569;
+      --text-muted:     #94a3b8;
+      --text-inverse:   #ffffff;
+
+      --shadow-sm:  0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md:  0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+      --shadow-lg:  0 10px 30px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.05);
+
+      --sidebar-w: 260px;
+      --radius-sm:  8px;
+      --radius-md:  12px;
+      --radius-lg:  16px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-body);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    /* ── SIDEBAR ── */
+    #sidebar {
+      width: var(--sidebar-w);
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      position: fixed;
+      top: 0; left: 0; height: 100vh;
+      z-index: 1000;
+      overflow-y: auto;
+      transition: transform 0.3s ease;
+      box-shadow: var(--shadow-sm);
+    }
+
+    #sidebar .brand {
+      padding: 1.25rem 1.25rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(135deg, #f8f7ff 0%, #fdf2f8 100%);
+    }
+    #sidebar .brand h5 {
+      font-weight: 800;
+      font-size: 0.95rem;
+      margin: 0;
+      color: var(--primary);
+    }
+    #sidebar .brand small { color: var(--text-muted); font-size: 0.7rem; }
+    .brand-logo {
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 12px rgba(79,70,229,0.25);
+    }
+
+    #sidebar .nav-link {
+      color: var(--text-secondary);
+      padding: 0.6rem 1rem;
+      border-radius: var(--radius-sm);
+      margin: 2px 10px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      transition: all 0.18s ease;
+    }
+    #sidebar .nav-link i { font-size: 1.05rem; width: 20px; }
+    #sidebar .nav-link:hover {
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+    #sidebar .nav-link.active {
+      background: var(--primary-light);
+      color: var(--primary);
+      font-weight: 600;
+    }
+    #sidebar .nav-link.active i { color: var(--primary); }
+
+    .nav-section {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      padding: 1rem 1.25rem 0.35rem;
+    }
+
+    /* ── MAIN ── */
+    #main {
+      margin-left: var(--sidebar-w);
+      min-height: 100vh;
+      transition: margin 0.3s;
+    }
+
+    /* ── TOPBAR ── */
+    #topbar {
+      background: var(--bg-topbar);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0.7rem 1.5rem;
+      position: sticky;
+      top: 0; z-index: 900;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow-sm);
+    }
+    #topbar .page-title {
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: var(--text-primary);
+    }
+    .user-badge {
+      background: var(--primary-light);
+      color: var(--primary);
+      border-radius: 20px;
+      padding: 0.3rem 0.9rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border: 1px solid rgba(79,70,229,0.2);
+    }
+
+    /* ── PAGE CONTENT ── */
+    .page-content { padding: 1.5rem; }
+
+    /* ── CARDS ── */
+    .card-light {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* ── STAT CARDS ── */
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.25rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: var(--shadow-sm);
+    }
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+    .stat-card.primary::before { background: linear-gradient(90deg, #4f46e5, #7c3aed); }
+    .stat-card.success::before { background: linear-gradient(90deg, #059669, #10b981); }
+    .stat-card.warning::before { background: linear-gradient(90deg, #d97706, #f59e0b); }
+    .stat-card.danger::before  { background: linear-gradient(90deg, #dc2626, #e11d48); }
+
+    .stat-card .stat-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+    .stat-card .stat-value {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-top: 0.25rem;
+      color: var(--text-primary);
+    }
+    .stat-card.primary .stat-value { color: var(--primary); }
+    .stat-card.success .stat-value { color: var(--success); }
+    .stat-card.warning .stat-value { color: var(--warning); }
+    .stat-card.danger  .stat-value { color: var(--danger); }
+
+    .stat-card .stat-icon {
+      position: absolute;
+      right: 1.25rem; top: 50%;
+      transform: translateY(-50%);
+      font-size: 2.8rem;
+      opacity: 0.07;
+      color: var(--text-primary);
+    }
+
+    /* ── TABLES ── */
+    .table-light-custom {
+      background: transparent;
+      color: var(--text-primary);
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+    .table-light-custom thead tr {
+      background: #f8fafc;
+    }
+    .table-light-custom thead th {
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 2px solid var(--border);
+      border-top: none;
+      padding: 0.85rem 1rem;
+    }
+    .table-light-custom tbody td {
+      border-color: var(--border);
+      padding: 0.75rem 1rem;
+      vertical-align: middle;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+    .table-light-custom tbody tr:hover {
+      background: #f8fafc;
+    }
+    .table-light-custom tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* ── BADGES ── */
+    .badge-success { background: var(--success-light); color: var(--success); border: 1px solid #a7f3d0; font-weight: 600; }
+    .badge-warning { background: var(--warning-light); color: var(--warning); border: 1px solid #fde68a; font-weight: 600; }
+    .badge-danger  { background: var(--danger-light);  color: var(--danger);  border: 1px solid #fca5a5; font-weight: 600; }
+    .badge-info    { background: var(--info-light);    color: var(--info);    border: 1px solid #bae6fd; font-weight: 600; }
+    .badge-primary { background: var(--primary-light); color: var(--primary); border: 1px solid #c4b5fd; font-weight: 600; }
+
+    /* ── BUTTONS ── */
+    .btn-primary-custom {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      border: none;
+      color: white;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 1.4rem;
+      transition: all 0.2s;
+      box-shadow: 0 2px 8px rgba(79,70,229,0.25);
+      font-size: 0.875rem;
+    }
+    .btn-primary-custom:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(79,70,229,0.35);
+      color: white;
+    }
+    .btn-accent {
+      background: linear-gradient(135deg, var(--accent), #be123c);
+      border: none;
+      color: white;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 1.4rem;
+      box-shadow: 0 2px 8px rgba(225,29,72,0.2);
+      font-size: 0.875rem;
+      transition: all 0.2s;
+    }
+    .btn-accent:hover { transform: translateY(-1px); color: white; box-shadow: 0 6px 18px rgba(225,29,72,0.3); }
+    .btn-outline-custom {
+      border: 1px solid var(--border-strong);
+      color: var(--text-secondary);
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 1.4rem;
+      background: white;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .btn-outline-custom:hover { background: var(--primary-light); color: var(--primary); border-color: rgba(79,70,229,0.3); }
+
+    /* ── FORMS ── */
+    .form-control, .form-select {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      border-radius: var(--radius-sm);
+      font-size: 0.875rem;
+    }
+    .form-control:focus, .form-select:focus {
+      background: white;
+      border-color: var(--primary);
+      color: var(--text-primary);
+      box-shadow: 0 0 0 3px rgba(79,70,229,0.1);
+    }
+    .form-label { color: var(--text-secondary); font-size: 0.82rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .form-control::placeholder { color: var(--text-muted); }
+
+    /* ── PROGRESS ── */
+    .progress { background: #e2e8f0; height: 8px; border-radius: 10px; }
+    .progress-bar { border-radius: 10px; }
+
+    /* ── ALERTS ── */
+    .alert-light-success {
+      background: var(--success-light);
+      border: 1px solid #6ee7b7;
+      color: #065f46;
+      border-radius: var(--radius-md);
+    }
+    .alert-light-error {
+      background: var(--danger-light);
+      border: 1px solid #fca5a5;
+      color: #991b1b;
+      border-radius: var(--radius-md);
+    }
+    .alert-light-warning {
+      background: var(--warning-light);
+      border: 1px solid #fcd34d;
+      color: #92400e;
+      border-radius: var(--radius-md);
+    }
+
+    /* ── SIDEBAR FOOTER ── */
+    .sidebar-footer {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 1rem;
+      border-top: 1px solid var(--border);
+      background: #f8fafc;
+    }
+    .user-avatar {
+      width: 32px; height: 32px;
+      background: var(--primary-light);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+
+    /* ── MISC ── */
+    .section-header {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      margin-bottom: 1rem;
+    }
+
+    .animate-in { animation: slideIn 0.35s ease; }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── MOBILE ── */
+    #sidebar-toggle { display: none; }
+    @media (max-width: 768px) {
+      #sidebar { transform: translateX(-100%); box-shadow: none; }
+      #sidebar.open { transform: translateX(0); box-shadow: var(--shadow-lg); }
+      #main { margin-left: 0; }
+      #sidebar-toggle { display: block; }
+      .page-content { padding: 1rem; }
+      .stat-value { font-size: 1.6rem !important; }
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg-body); }
+    ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+
+    /* ── DIVIDER ── */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0.5rem 0;
+    }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav id="sidebar">
+  <div class="brand">
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <div class="brand-logo">
+        <i class="bi bi-qr-code" style="color:white;font-size:1rem;"></i>
+      </div>
+      <h5>VKC QR Tracker</h5>
+    </div>
+    <small>Fortune Elastomers Pvt. Ltd.</small>
+  </div>
+
+  <div class="mt-2 pb-5">
+    <div class="nav-section">Main</div>
+    <a href="{% url 'dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+      <i class="bi bi-grid-1x2"></i> Dashboard
+    </a>
+    <a href="{% url 'scanner' %}" class="nav-link {% if request.resolver_match.url_name == 'scanner' %}active{% endif %}">
+      <i class="bi bi-camera"></i> QR Scanner
+    </a>
+
+    <div class="nav-section mt-1">Production</div>
+    <a href="{% url 'create_order' %}" class="nav-link {% if request.resolver_match.url_name == 'create_order' %}active{% endif %}">
+      <i class="bi bi-plus-circle"></i> New Order
+    </a>
+    <a href="{% url 'batch_list' %}" class="nav-link {% if request.resolver_match.url_name == 'batch_list' %}active{% endif %}">
+      <i class="bi bi-collection"></i> All Batches
+    </a>
+
+    <div class="nav-section mt-1">Analytics</div>
+    <a href="{% url 'reports' %}" class="nav-link {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
+      <i class="bi bi-bar-chart"></i> Reports
+    </a>
+
+    {% if user.is_staff %}
+    <div class="nav-section mt-1">Admin</div>
+    <a href="/admin/" class="nav-link" target="_blank">
+      <i class="bi bi-shield"></i> Django Admin
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- User info -->
+  <div class="sidebar-footer">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <div class="user-avatar">
+        <i class="bi bi-person-fill" style="color:var(--primary);font-size:0.95rem;"></i>
+      </div>
+      <div>
+        <div style="font-size:0.8rem;font-weight:600;color:var(--text-primary);">{{ user.get_full_name|default:user.username }}</div>
+        <div style="font-size:0.7rem;color:var(--text-muted);">{% if user.is_staff %}Administrator{% else %}Staff{% endif %}</div>
+      </div>
+    </div>
+    <a href="{% url 'logout' %}" class="nav-link" style="margin:0;padding:0.4rem 0.5rem;color:var(--danger);">
+      <i class="bi bi-box-arrow-right"></i> Sign Out
+    </a>
+  </div>
+</nav>
+
+<!-- Main -->
+<div id="main">
+  <!-- Topbar -->
+  <div id="topbar">
+    <div class="d-flex align-items-center gap-3">
+      <button id="sidebar-toggle" class="btn btn-sm btn-outline-custom" onclick="toggleSidebar()" style="padding:0.35rem 0.65rem;">
+        <i class="bi bi-list"></i>
+      </button>
+      <span class="page-title">{% block page_title %}Dashboard{% endblock %}</span>
+    </div>
+    <div class="d-flex align-items-center gap-3">
+      <div class="d-none d-md-flex align-items-center gap-1" style="font-size:0.78rem;color:var(--text-muted);">
+        <i class="bi bi-clock" style="font-size:0.85rem;"></i>
+        <span id="live-clock"></span>
+      </div>
+      <span class="user-badge"><i class="bi bi-person-circle me-1"></i>{{ user.username }}</span>
+    </div>
+  </div>
+
+  <!-- Django Messages -->
+  {% if messages %}
+  <div class="page-content pb-0">
+    {% for message in messages %}
+    <div class="alert {% if message.tags == 'success' %}alert-light-success{% elif message.tags == 'error' %}alert-light-error{% else %}alert-light-warning{% endif %} alert-dismissible animate-in" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="page-content">
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  function updateClock() {
+    const now = new Date();
+    const el = document.getElementById('live-clock');
+    if (el) el.textContent = now.toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+  }
+  document.addEventListener('click', function(e) {
+    const sidebar = document.getElementById('sidebar');
+    const toggle  = document.getElementById('sidebar-toggle');
+    if (window.innerWidth <= 768 && sidebar.classList.contains('open')) {
+      if (!sidebar.contains(e.target) && toggle && !toggle.contains(e.target)) {
+        sidebar.classList.remove('open');
+      }
+    }
+  });
+  setTimeout(() => {
+    document.querySelectorAll('.alert').forEach(a => {
+      const bsAlert = bootstrap.Alert.getOrCreateInstance(a);
+      if (bsAlert) bsAlert.close();
+    });
+  }, 5000);
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,129 @@
+{% extends "tracker/base.html" %}
+{% block title %}Review Order — VKC QR Tracker{% endblock %}
+{% block page_title %}<i class="bi bi-clipboard-check me-2" style="color:var(--primary);"></i>Review Order{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{% url 'create_order' %}" class="btn btn-outline-custom btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+  <span style="font-size:0.82rem;color:var(--text-muted);">Step 2 of 3 — Review & Confirm</span>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="card-light mb-4">
+      <div class="section-header"><i class="bi bi-list-check me-1"></i>Order Summary</div>
+      <div class="table-responsive">
+        <table class="table table-light-custom">
+          <thead><tr>
+            <th>#</th><th>Size</th><th>Article Number</th><th>Quantity (QR Codes)</th>
+          </tr></thead>
+          <tbody>
+            {% for item in cart %}
+            <tr>
+              <td style="color:var(--text-muted);">{{ forloop.counter }}</td>
+              <td><span style="font-size:1.1rem;font-weight:700;color:var(--text-primary);">{{ item.size }}</span></td>
+              <td>
+                <code style="color:var(--primary);background:var(--primary-light);padding:2px 8px;border-radius:4px;font-size:0.82rem;">
+                  {{ item.article }}
+                </code>
+              </td>
+              <td>
+                <span class="badge badge-primary" style="font-size:0.88rem;padding:0.35rem 0.8rem;">
+                  {{ item.quantity }} QR codes
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr style="border-top:2px solid var(--border);">
+              <td colspan="3" style="font-weight:600;color:var(--text-muted);text-align:right;padding-right:2rem;">
+                Total QR Codes to Generate:
+              </td>
+              <td>
+                <span style="font-size:1.4rem;font-weight:800;color:var(--primary);">{{ total_qty }}</span>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="card-light">
+      <div class="section-header"><i class="bi bi-sticky me-1"></i>Batch Notes (Optional)</div>
+      <form method="post" action="{% url 'generate_batch' %}" id="generate-form">
+        {% csrf_token %}
+        <div class="mb-3">
+          <textarea name="notes" class="form-control" rows="3"
+                    placeholder="Add any notes for this batch (e.g., shift details, supervisor name)..."></textarea>
+        </div>
+        <div class="d-flex gap-3">
+          <a href="{% url 'create_order' %}" class="btn btn-outline-custom">
+            <i class="bi bi-pencil me-1"></i>Edit Order
+          </a>
+          <button type="submit" class="btn btn-accent flex-grow-1 btn-lg" id="generate-btn">
+            <i class="bi bi-qr-code me-2"></i>Generate & Print All QR Codes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Info Panel -->
+  <div class="col-lg-4">
+    <div class="card-light mb-3">
+      <div class="section-header"><i class="bi bi-info-circle me-1"></i>What Happens Next</div>
+      <div class="d-flex flex-column gap-3">
+        {% for step, title, sub in steps_info|default:"" %}{% endfor %}
+        <div class="d-flex gap-3">
+          <div style="width:30px;height:30px;background:var(--primary-light);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span style="color:var(--primary);font-weight:700;font-size:0.82rem;">1</span>
+          </div>
+          <div>
+            <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);">Unique QR codes generated</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">Each with UUID + article + size + timestamp</div>
+          </div>
+        </div>
+        <div class="d-flex gap-3">
+          <div style="width:30px;height:30px;background:var(--primary-light);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span style="color:var(--primary);font-weight:700;font-size:0.82rem;">2</span>
+          </div>
+          <div>
+            <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);">QR images saved to database</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">Size displayed clearly on each QR code</div>
+          </div>
+        </div>
+        <div class="d-flex gap-3">
+          <div style="width:30px;height:30px;background:var(--primary-light);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span style="color:var(--primary);font-weight:700;font-size:0.82rem;">3</span>
+          </div>
+          <div>
+            <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);">Printable PDF ready</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">Print entire batch with one click</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-light">
+      <div class="section-header"><i class="bi bi-lightning me-1"></i>QR Data Format</div>
+      <code style="font-size:0.72rem;color:var(--primary);word-break:break-all;display:block;background:var(--primary-light);padding:0.75rem;border-radius:var(--radius-sm);">
+        FT-{article}-{size}-{uuid}-{timestamp}
+      </code>
+      <p style="font-size:0.72rem;color:var(--text-muted);margin-top:0.75rem;margin-bottom:0;">
+        Example: FT-301070789001-36-A1B2C3D4E5F6-20260603143000
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('generate-form').addEventListener('submit', function() {
+  const btn = document.getElementById('generate-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner-border spinner-border-sm me-2"></div>Generating QR Codes...';
+});
+</script>
+{% endblock %}

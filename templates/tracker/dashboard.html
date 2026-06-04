@@ -1,0 +1,223 @@
+{% extends "tracker/base.html" %}
+{% block title %}Dashboard — VKC QR Tracker{% endblock %}
+{% block page_title %}<i class="bi bi-grid-1x2 me-2" style="color:var(--primary);"></i>Dashboard{% endblock %}
+
+{% block content %}
+<!-- KPI Stats -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="stat-card primary animate-in">
+      <div class="stat-label">Total QR Printed</div>
+      <div class="stat-value" id="stat-printed">{{ total_printed }}</div>
+      <div style="font-size:0.73rem;color:var(--text-muted);margin-top:4px;">All time</div>
+      <i class="bi bi-qr-code stat-icon"></i>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card success animate-in">
+      <div class="stat-label">Total Scanned</div>
+      <div class="stat-value" id="stat-scanned">{{ total_scanned }}</div>
+      <div style="font-size:0.73rem;color:var(--text-muted);margin-top:4px;">Verified in stock</div>
+      <i class="bi bi-check-circle stat-icon"></i>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card warning animate-in">
+      <div class="stat-label">Remaining Unscanned</div>
+      <div class="stat-value" id="stat-unscanned">{{ total_unscanned }}</div>
+      <div style="font-size:0.73rem;color:var(--text-muted);margin-top:4px;">Awaiting scan</div>
+      <i class="bi bi-hourglass-split stat-icon"></i>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="stat-card danger animate-in">
+      <div class="stat-label">Completion</div>
+      <div class="stat-value" id="stat-pct">{{ completion_pct }}%</div>
+      <div class="progress mt-2" style="height:5px;">
+        <div class="progress-bar" style="width:{{ completion_pct }}%;background:linear-gradient(90deg,#dc2626,#e11d48);"></div>
+      </div>
+      <i class="bi bi-pie-chart stat-icon"></i>
+    </div>
+  </div>
+</div>
+
+<!-- Today + Quick Actions -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card-light h-100">
+      <div class="section-header"><i class="bi bi-sun me-1"></i>Today's Activity</div>
+      <div class="d-flex justify-content-between mb-3">
+        <div class="text-center">
+          <div style="font-size:0.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Printed</div>
+          <div style="font-size:1.75rem;font-weight:800;color:var(--primary);">{{ today_printed }}</div>
+        </div>
+        <div style="width:1px;background:var(--border);"></div>
+        <div class="text-center">
+          <div style="font-size:0.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Scanned</div>
+          <div style="font-size:1.75rem;font-weight:800;color:var(--success);">{{ today_scanned }}</div>
+        </div>
+        <div style="width:1px;background:var(--border);"></div>
+        <div class="text-center">
+          <div style="font-size:0.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Pending</div>
+          <div style="font-size:1.75rem;font-weight:800;color:var(--warning);">{{ today_printed|add:"-"|add:today_scanned }}</div>
+        </div>
+      </div>
+      <div class="d-flex gap-2 mt-auto pt-2">
+        <a href="{% url 'create_order' %}" class="btn btn-primary-custom flex-grow-1">
+          <i class="bi bi-plus-circle me-1"></i>New Order
+        </a>
+        <a href="{% url 'scanner' %}" class="btn btn-accent flex-grow-1">
+          <i class="bi bi-camera me-1"></i>Scan
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Batches -->
+  <div class="col-md-8">
+    <div class="card-light h-100">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="section-header mb-0"><i class="bi bi-collection me-1"></i>Recent Batches</div>
+        <a href="{% url 'batch_list' %}" style="font-size:0.8rem;color:var(--primary);text-decoration:none;font-weight:600;">View All →</a>
+      </div>
+      {% if recent_batches %}
+      <div class="table-responsive">
+        <table class="table table-light-custom mb-0">
+          <thead><tr>
+            <th>Batch ID</th><th>QR Count</th><th>Scanned</th><th>Status</th><th></th>
+          </tr></thead>
+          <tbody>
+            {% for b in recent_batches %}
+            <tr>
+              <td>
+                <span style="font-size:0.8rem;color:var(--primary);font-weight:600;">{{ b.batch_id }}</span><br>
+                <span style="font-size:0.7rem;color:var(--text-muted);">{{ b.created_at|date:"d M Y H:i" }}</span>
+              </td>
+              <td><span class="badge badge-primary rounded-pill">{{ b.total_qr_count }}</span></td>
+              <td><span class="badge badge-success rounded-pill">{{ b.scanned_count }}</span></td>
+              <td>
+                {% if b.is_printed %}
+                  <span class="badge badge-success" style="font-size:0.7rem;">Printed</span>
+                {% else %}
+                  <span class="badge badge-warning" style="font-size:0.7rem;">Pending</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="{% url 'batch_detail' b.id %}" class="btn btn-outline-custom btn-sm py-1">
+                  <i class="bi bi-eye"></i>
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-4" style="color:var(--text-muted);">
+        <i class="bi bi-inbox" style="font-size:2.5rem;opacity:0.4;"></i>
+        <p class="mt-2 mb-3" style="font-size:0.85rem;">No batches yet.</p>
+        <a href="{% url 'create_order' %}" class="btn btn-primary-custom btn-sm">Create First Order</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Article/Size Breakdown -->
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card-light">
+      <div class="section-header"><i class="bi bi-table me-1"></i>Stock by Article & Size</div>
+      {% if breakdown %}
+      <div class="table-responsive">
+        <table class="table table-light-custom mb-0">
+          <thead><tr>
+            <th>Size</th><th>Article Number</th><th>Printed</th><th>Scanned</th><th>Unscanned</th><th>Progress</th>
+          </tr></thead>
+          <tbody>
+            {% for row in breakdown %}
+            <tr>
+              <td>
+                <span style="font-size:1rem;font-weight:700;color:var(--text-primary);">{{ row.size }}</span>
+              </td>
+              <td><code style="color:var(--primary);font-size:0.8rem;background:var(--primary-light);padding:2px 6px;border-radius:4px;">{{ row.article }}</code></td>
+              <td><span class="badge badge-primary rounded-pill">{{ row.printed }}</span></td>
+              <td><span class="badge badge-success rounded-pill">{{ row.scanned }}</span></td>
+              <td><span class="badge badge-warning rounded-pill">{{ row.unscanned }}</span></td>
+              <td style="min-width:130px;">
+                <div class="d-flex align-items-center gap-2">
+                  <div class="progress flex-grow-1">
+                    <div class="progress-bar" style="width:{{ row.pct }}%;background:linear-gradient(90deg,#4f46e5,#7c3aed);"></div>
+                  </div>
+                  <span style="font-size:0.75rem;color:var(--text-muted);min-width:38px;">{{ row.pct }}%</span>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-4" style="color:var(--text-muted);">
+        <i class="bi bi-bar-chart" style="font-size:2.5rem;opacity:0.3;"></i>
+        <p class="mt-2 mb-0" style="font-size:0.85rem;">No data yet. Generate your first batch to see stats.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Recent Scans -->
+  <div class="col-lg-4">
+    <div class="card-light">
+      <div class="section-header"><i class="bi bi-activity me-1"></i>Recent Scan Events</div>
+      {% if recent_scans %}
+      <div style="max-height:310px;overflow-y:auto;">
+        {% for scan in recent_scans %}
+        <div style="padding:0.6rem 0;border-bottom:1px solid var(--border);" class="d-flex align-items-center gap-2">
+          {% if scan.status == 'success' %}
+            <div style="width:8px;height:8px;background:var(--success);border-radius:50%;flex-shrink:0;"></div>
+          {% elif scan.status == 'already_scanned' %}
+            <div style="width:8px;height:8px;background:var(--warning);border-radius:50%;flex-shrink:0;"></div>
+          {% else %}
+            <div style="width:8px;height:8px;background:var(--danger);border-radius:50%;flex-shrink:0;"></div>
+          {% endif %}
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:0.78rem;font-weight:600;color:var(--text-primary);">
+              {% if scan.qr_code %}Size {{ scan.qr_code.size }}{% else %}Unknown{% endif %}
+              <span style="color:var(--text-muted);font-weight:400;"> — {{ scan.get_status_display }}</span>
+            </div>
+            <div style="font-size:0.7rem;color:var(--text-muted);">{{ scan.scanned_at|date:"d M H:i:s" }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-center py-3" style="color:var(--text-muted);">
+        <i class="bi bi-camera" style="font-size:1.8rem;opacity:0.3;"></i>
+        <p class="mt-2 mb-0" style="font-size:0.8rem;">No scans yet</p>
+      </div>
+      {% endif %}
+      <div class="text-center mt-3">
+        <a href="{% url 'scanner' %}" class="btn btn-accent btn-sm w-100">
+          <i class="bi bi-camera-fill me-1"></i>Open Scanner
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+setInterval(() => {
+  fetch('{% url "live_stats" %}')
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('stat-printed').textContent  = d.total_printed;
+      document.getElementById('stat-scanned').textContent  = d.total_scanned;
+      document.getElementById('stat-unscanned').textContent= d.total_unscanned;
+      document.getElementById('stat-pct').textContent      = d.completion_pct + '%';
+    }).catch(() => {});
+}, 30000);
+</script>
+{% endblock %}

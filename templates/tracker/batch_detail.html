@@ -1,0 +1,146 @@
+{% extends "tracker/base.html" %}
+{% block title %}Batch {{ batch.batch_id }} — VKC QR Tracker{% endblock %}
+{% block page_title %}<i class="bi bi-collection me-2" style="color:var(--primary);"></i>Batch Detail{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4 flex-wrap gap-2">
+  <div>
+    <h5 style="font-weight:700;color:var(--text-primary);margin:0;">{{ batch.batch_id }}</h5>
+    <div style="font-size:0.8rem;color:var(--text-muted);">
+      Created {{ batch.created_at|date:"d M Y H:i" }} by {{ batch.created_by.username|default:"System" }}
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{% url 'print_batch' batch.id %}" class="btn btn-primary-custom" target="_blank">
+      <i class="bi bi-printer-fill me-2"></i>Print Entire Order (PDF)
+    </a>
+    <a href="{% url 'batch_list' %}" class="btn btn-outline-custom">
+      <i class="bi bi-arrow-left me-1"></i>All Batches
+    </a>
+  </div>
+</div>
+
+<!-- Stats Row -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="stat-card primary">
+      <div class="stat-label">Total QR</div>
+      <div class="stat-value" style="font-size:1.6rem;">{{ batch.total_qr_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card success">
+      <div class="stat-label">Scanned</div>
+      <div class="stat-value" style="font-size:1.6rem;">{{ batch.scanned_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card warning">
+      <div class="stat-label">Unscanned</div>
+      <div class="stat-value" style="font-size:1.6rem;">{{ batch.unscanned_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card {% if batch.is_printed %}success{% else %}warning{% endif %}">
+      <div class="stat-label">Print Status</div>
+      <div style="font-size:1rem;font-weight:700;margin-top:0.35rem;">
+        {% if batch.is_printed %}
+          <span style="color:var(--success);"><i class="bi bi-check-circle-fill"></i> Printed</span>
+        {% else %}
+          <span style="color:var(--warning);"><i class="bi bi-clock"></i> Not Printed</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Order Items & Filter -->
+<div class="row g-4 mb-4">
+  <div class="col-md-5">
+    <div class="card-light h-100">
+      <div class="section-header"><i class="bi bi-list-ol me-1"></i>Order Items</div>
+      <table class="table table-light-custom mb-0">
+        <thead><tr><th>Size</th><th>Article</th><th>Qty</th></tr></thead>
+        <tbody>
+          {% for item in order_items %}
+          <tr>
+            <td><strong style="color:var(--text-primary);">{{ item.size }}</strong></td>
+            <td>
+              <code style="color:var(--primary);background:var(--primary-light);padding:1px 6px;border-radius:4px;font-size:0.75rem;">
+                {{ item.article_number }}
+              </code>
+            </td>
+            <td><span class="badge badge-primary rounded-pill">{{ item.quantity }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if batch.notes %}
+      <div style="margin-top:1rem;padding:0.75rem;background:#f8fafc;border-radius:var(--radius-sm);border:1px solid var(--border);">
+        <div style="font-size:0.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:0.25rem;">Notes</div>
+        <div style="font-size:0.85rem;color:var(--text-secondary);">{{ batch.notes }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-md-7">
+    <div class="card-light h-100">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="section-header mb-0"><i class="bi bi-filter me-1"></i>Filter by Size</div>
+        {% if filter_size %}
+        <a href="{% url 'batch_detail' batch.id %}" class="btn btn-outline-custom btn-sm py-1">Clear Filter</a>
+        {% endif %}
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        {% for sz in sizes %}
+        <a href="?size={{ sz }}"
+           class="btn btn-sm {% if filter_size == sz|stringformat:'s' %}btn-primary-custom{% else %}btn-outline-custom{% endif %}">
+          Size {{ sz }}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- QR Grid -->
+<div class="card-light">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="section-header mb-0">
+      <i class="bi bi-qr-code me-1"></i>QR Codes
+      <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;margin-left:0.4rem;">({{ qr_codes|length }} shown)</span>
+    </div>
+  </div>
+
+  {% if qr_codes %}
+  <div class="row g-2">
+    {% for qr in qr_codes %}
+    <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+      <div style="background:{% if qr.is_scanned %}var(--success-light){% else %}#f8fafc{% endif %}; border:1px solid {% if qr.is_scanned %}#6ee7b7{% else %}var(--border){% endif %}; border-radius:var(--radius-md);padding:0.75rem;text-align:center;position:relative;transition:all 0.2s;">
+        {% if qr.is_scanned %}
+        <div style="position:absolute;top:6px;right:6px;background:var(--success);color:white;
+                    border-radius:4px;padding:1px 5px;font-size:0.58rem;font-weight:700;">✓ DONE</div>
+        {% endif %}
+        {% if qr.qr_image %}
+        <img src="{{ qr.qr_image.url }}" alt="QR Size {{ qr.size }}" style="width:100%;border-radius:6px;{% if qr.is_scanned %}opacity:0.6;{% endif %}" />
+        {% else %}
+        <div style="width:100%;aspect-ratio:1;background:var(--primary-light);border-radius:6px;
+                    display:flex;align-items:center;justify-content:center;color:var(--primary);">
+          <i class="bi bi-qr-code" style="font-size:2rem;"></i>
+        </div>
+        {% endif %}
+        <div style="font-size:0.72rem;font-weight:700;color:var(--text-primary);margin-top:0.3rem;">Size {{ qr.size }}</div>
+        <div style="font-size:0.62rem;color:var(--text-muted);">{{ qr.created_at|date:"d M H:i" }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-4" style="color:var(--text-muted);">
+    <i class="bi bi-qr-code" style="font-size:2.5rem;opacity:0.25;"></i>
+    <p class="mt-2 mb-0" style="font-size:0.85rem;">No QR codes found for this filter.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

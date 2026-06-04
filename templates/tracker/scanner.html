@@ -1,0 +1,338 @@
+{% extends "tracker/base.html" %}
+{% block title %}QR Scanner — VKC QR Tracker{% endblock %}
+{% block page_title %}<i class="bi bi-camera me-2" style="color:var(--accent);"></i>QR Scanner{% endblock %}
+
+{% block extra_head %}
+<script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+<style>
+.scanner-viewport {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #0f172a;
+  box-shadow: 0 0 0 3px var(--primary), 0 16px 40px rgba(79,70,229,0.20);
+}
+#scanner-video { width:100%;display:block;border-radius:20px; }
+.scan-overlay {
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  display:flex;align-items:center;justify-content:center;pointer-events:none;
+}
+.scan-frame { width:200px;height:200px;border-radius:16px;position:relative; }
+.scan-frame::before,.scan-frame::after,.scan-frame .c3,.scan-frame .c4 {
+  content:'';position:absolute;width:28px;height:28px;
+  border-color:white;border-style:solid;border-width:0;
+}
+.scan-frame::before { top:0;left:0;border-top-width:3px;border-left-width:3px;border-radius:6px 0 0 0; }
+.scan-frame::after  { top:0;right:0;border-top-width:3px;border-right-width:3px;border-radius:0 6px 0 0; }
+.scan-frame .c3     { bottom:0;left:0;border-bottom-width:3px;border-left-width:3px;border-radius:0 0 0 6px; }
+.scan-frame .c4     { bottom:0;right:0;border-bottom-width:3px;border-right-width:3px;border-radius:0 0 6px 0; }
+.scan-line {
+  position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--primary),transparent);
+  animation:scanLine 2s linear infinite;display:none;
+}
+@keyframes scanLine { 0%{top:0;opacity:0;}5%{opacity:1;}95%{opacity:1;}100%{top:100%;opacity:0;} }
+
+.result-card {
+  border-radius:var(--radius-lg);padding:1.5rem;text-align:center;
+  animation:popIn 0.35s cubic-bezier(0.34,1.56,0.64,1);margin-bottom:1rem;
+}
+@keyframes popIn { from{transform:scale(0.85);opacity:0;}to{transform:scale(1);opacity:1;} }
+.result-success { background:var(--success-light);border:2px solid #6ee7b7; }
+.result-warning { background:var(--warning-light);border:2px solid #fcd34d; }
+.result-error   { background:var(--danger-light);border:2px solid #fca5a5; }
+.result-icon { font-size:2.8rem;line-height:1;margin-bottom:0.5rem; }
+.result-text { font-size:1.2rem;font-weight:700; }
+.result-sub  { font-size:0.82rem;margin-top:0.25rem; }
+
+.counter-box {
+  background:white;border:1px solid var(--border);border-radius:var(--radius-md);
+  padding:0.75rem 1.25rem;text-align:center;min-width:78px;
+  box-shadow:var(--shadow-sm);
+}
+.counter-box .num { font-size:1.9rem;font-weight:800; }
+.counter-box .lbl { font-size:0.68rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px; }
+
+.offline-banner {
+  background:var(--warning-light);border:1px solid #fcd34d;color:var(--warning);
+  border-radius:var(--radius-md);padding:0.6rem 1rem;font-size:0.82rem;display:none;text-align:center;
+}
+#manual-input-wrap { display:none; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="offline-banner mb-3" id="offline-banner">
+  <i class="bi bi-wifi-off me-2"></i>Offline Mode — Scans queued and will sync when back online
+  <span id="offline-count" class="ms-2 badge" style="background:rgba(217,119,6,0.2);color:var(--warning);"></span>
+</div>
+
+<div class="row g-4">
+
+  <!-- Camera Column -->
+  <div class="col-lg-6">
+    <div class="card-light text-center">
+
+      <div class="mb-3 d-flex gap-2 justify-content-center flex-wrap">
+        <select id="camera-select" class="form-select" style="max-width:280px;">
+          <option value="">Select Camera</option>
+        </select>
+        <button id="start-btn" class="btn btn-primary-custom" onclick="startScanner()">
+          <i class="bi bi-camera-video me-1"></i>Start
+        </button>
+        <button id="stop-btn" class="btn btn-outline-custom" onclick="stopScanner()" style="display:none;">
+          <i class="bi bi-stop-circle me-1"></i>Stop
+        </button>
+      </div>
+
+      <div class="scanner-viewport mb-3">
+        <video id="scanner-video" autoplay playsinline muted></video>
+        <div class="scan-overlay">
+          <div class="scan-frame">
+            <div class="scan-line" id="scan-line"></div>
+            <span class="c3"></span><span class="c4"></span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <button class="btn btn-outline-custom btn-sm mb-3" onclick="toggleManual()">
+          <i class="bi bi-keyboard me-1"></i>Manual Input
+        </button>
+      </div>
+      <div id="manual-input-wrap">
+        <div class="input-group mb-2">
+          <input type="text" id="manual-qr-input" class="form-control" placeholder="Paste QR data here..." />
+          <button class="btn btn-primary-custom" onclick="submitManual()">Submit</button>
+        </div>
+      </div>
+
+      <div style="font-size:0.75rem;color:var(--text-muted);">
+        <i class="bi bi-info-circle me-1"></i>Point camera at a VKC QR code. Works on phone & desktop.
+      </div>
+    </div>
+  </div>
+
+  <!-- Result Column -->
+  <div class="col-lg-6">
+
+    <div id="result-display" class="mb-4" style="min-height:130px;">
+      <div style="background:#f8fafc;border:1.5px dashed var(--border-strong);border-radius:var(--radius-lg);
+                  padding:2rem;text-align:center;color:var(--text-muted);">
+        <i class="bi bi-qr-code-scan" style="font-size:2.5rem;opacity:0.35;"></i>
+        <p style="margin-top:0.75rem;margin-bottom:0;font-size:0.85rem;">Scan result will appear here</p>
+      </div>
+    </div>
+
+    <!-- Session Stats -->
+    <div class="card-light mb-4">
+      <div class="section-header"><i class="bi bi-activity me-1"></i>This Session</div>
+      <div class="d-flex gap-2 justify-content-center flex-wrap">
+        <div class="counter-box">
+          <div class="num" style="color:var(--success);" id="sess-success">0</div>
+          <div class="lbl">Scanned</div>
+        </div>
+        <div class="counter-box">
+          <div class="num" style="color:var(--warning);" id="sess-duplicate">0</div>
+          <div class="lbl">Duplicate</div>
+        </div>
+        <div class="counter-box">
+          <div class="num" style="color:var(--danger);" id="sess-invalid">0</div>
+          <div class="lbl">Invalid</div>
+        </div>
+        <div class="counter-box">
+          <div class="num" style="color:var(--primary);" id="sess-total">0</div>
+          <div class="lbl">Total</div>
+        </div>
+      </div>
+      <div class="text-center mt-3">
+        <button class="btn btn-outline-custom btn-sm" onclick="resetSession()">
+          <i class="bi bi-arrow-clockwise me-1"></i>Reset Session
+        </button>
+      </div>
+    </div>
+
+    <!-- Scan History -->
+    <div class="card-light">
+      <div class="section-header"><i class="bi bi-clock-history me-1"></i>Recent Scans (This Session)</div>
+      <div id="scan-history" style="max-height:300px;overflow-y:auto;">
+        <div style="text-align:center;color:var(--text-muted);font-size:0.8rem;padding:1rem;">No scans yet this session</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CSRF = '{{ csrf_token }}';
+const SCAN_URL = '{% url "process_scan" %}';
+
+let codeReader = null, scanning = false;
+let sess = { success:0, duplicate:0, invalid:0 };
+let offlineQueue = JSON.parse(localStorage.getItem('vkc_offline_queue') || '[]');
+let isOnline = navigator.onLine;
+let lastScanned = null, lastScanTime = 0;
+
+window.addEventListener('online',  () => { isOnline=true;  document.getElementById('offline-banner').style.display='none'; syncOfflineQueue(); });
+window.addEventListener('offline', () => { isOnline=false; document.getElementById('offline-banner').style.display='block'; });
+if (!navigator.onLine) document.getElementById('offline-banner').style.display='block';
+
+async function initCameras() {
+  try {
+    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
+    const sel = document.getElementById('camera-select');
+    sel.innerHTML = '';
+    devices.forEach((d,i) => { const o=document.createElement('option');o.value=d.deviceId;o.text=d.label||`Camera ${i+1}`;sel.appendChild(o); });
+    const back = devices.find(d=>d.label.toLowerCase().includes('back')||d.label.toLowerCase().includes('rear'));
+    if (back) sel.value=back.deviceId;
+  } catch(e) { console.warn(e); }
+}
+
+function startScanner() {
+  const deviceId = document.getElementById('camera-select').value;
+  codeReader = new ZXing.BrowserQRCodeReader();
+  scanning = true;
+  document.getElementById('scan-line').style.display='block';
+  document.getElementById('start-btn').style.display='none';
+  document.getElementById('stop-btn').style.display='inline-flex';
+  const constraints = deviceId ? {video:{deviceId:{exact:deviceId}}} : {video:{facingMode:'environment'}};
+  codeReader.decodeFromConstraints(constraints, 'scanner-video', (result, err) => {
+    if (result) {
+      const now=Date.now(), qrText=result.getText();
+      if (qrText===lastScanned && now-lastScanTime<3000) return;
+      lastScanned=qrText; lastScanTime=now;
+      processQR(qrText);
+    }
+  }).catch(e=>console.error(e));
+}
+
+function stopScanner() {
+  if (codeReader) codeReader.reset();
+  scanning=false;
+  document.getElementById('scan-line').style.display='none';
+  document.getElementById('start-btn').style.display='inline-flex';
+  document.getElementById('stop-btn').style.display='none';
+}
+
+async function processQR(qrData) {
+  const deviceInfo=`${navigator.userAgent.substring(0,100)} | ${window.screen.width}x${window.screen.height}`;
+  if (!isOnline) {
+    offlineQueue.push({qr_data:qrData,device_info:deviceInfo,ts:Date.now()});
+    localStorage.setItem('vkc_offline_queue',JSON.stringify(offlineQueue));
+    document.getElementById('offline-count').textContent=offlineQueue.length;
+    showResult('offline','📴 Saved Offline','Will sync when back online',qrData);
+    addToHistory('offline',qrData,'Queued offline'); return;
+  }
+  try {
+    const resp = await fetch(SCAN_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},
+      body:JSON.stringify({qr_data:qrData,device_info:deviceInfo})
+    });
+    const data = await resp.json();
+    if (data.status==='success') {
+      sess.success++;
+      showResult('success', data.message, `Article: ${data.article} | Batch: ${data.batch}`, qrData, `${data.size_scanned}/${data.size_total} of Size ${data.size} scanned`);
+      addToHistory('success',qrData,`Size ${data.size}`);
+      playBeep(); vibrate([100]);
+    } else if (data.status==='already_scanned') {
+      sess.duplicate++;
+      showResult('warning', data.message, `First scanned: ${data.scanned_at}`, qrData);
+      addToHistory('duplicate',qrData,`Size ${data.size} (duplicate)`);
+      vibrate([50,50,50]);
+    } else {
+      sess.invalid++;
+      showResult('error', data.message, 'QR code not found in system', qrData);
+      addToHistory('invalid',qrData,'Invalid'); vibrate([200]);
+    }
+    updateCounters();
+  } catch(e) {
+    offlineQueue.push({qr_data:qrData,device_info:deviceInfo,ts:Date.now()});
+    localStorage.setItem('vkc_offline_queue',JSON.stringify(offlineQueue));
+    showResult('offline','📴 Network Error','Saved offline, will sync later',qrData);
+    addToHistory('offline',qrData,'Network error — queued');
+    isOnline=false; document.getElementById('offline-banner').style.display='block';
+  }
+}
+
+function showResult(type,msg,sub,raw,extra) {
+  const icons   = {success:'✅',warning:'⚠️',error:'❌',offline:'📴'};
+  const classes = {success:'result-success',warning:'result-warning',error:'result-error',offline:'result-warning'};
+  const colors  = {success:'var(--success)',warning:'var(--warning)',error:'var(--danger)',offline:'var(--warning)'};
+  document.getElementById('result-display').innerHTML=`
+    <div class="result-card ${classes[type]}">
+      <div class="result-icon">${icons[type]}</div>
+      <div class="result-text" style="color:${colors[type]};">${msg}</div>
+      <div class="result-sub" style="color:${colors[type]};opacity:0.8;">${sub||''}</div>
+      ${extra?`<div class="mt-2" style="font-size:0.78rem;color:var(--text-muted);">${extra}</div>`:''}
+      <div class="mt-2" style="font-size:0.65rem;color:var(--text-muted);word-break:break-all;">${raw||''}</div>
+    </div>`;
+}
+
+function addToHistory(type,qrData,label) {
+  const hist=document.getElementById('scan-history');
+  const colors={success:'var(--success)',warning:'var(--warning)',error:'var(--danger)',duplicate:'var(--warning)',invalid:'var(--danger)',offline:'var(--warning)'};
+  const now=new Date().toLocaleTimeString('en-IN');
+  const div=document.createElement('div');
+  div.style.cssText='padding:0.5rem 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;';
+  div.innerHTML=`
+    <div style="width:8px;height:8px;border-radius:50%;background:${colors[type]||'var(--text-muted)'};flex-shrink:0;"></div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:0.78rem;font-weight:600;color:var(--text-primary);">${label}</div>
+      <div style="font-size:0.65rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${qrData}</div>
+    </div>
+    <div style="font-size:0.65rem;color:var(--text-muted);flex-shrink:0;">${now}</div>`;
+  const ph=hist.querySelector('div');
+  if (ph&&ph.textContent.includes('No scans')) ph.remove();
+  hist.insertBefore(div,hist.firstChild);
+}
+
+function updateCounters() {
+  document.getElementById('sess-success').textContent  = sess.success;
+  document.getElementById('sess-duplicate').textContent= sess.duplicate;
+  document.getElementById('sess-invalid').textContent  = sess.invalid;
+  document.getElementById('sess-total').textContent    = sess.success+sess.duplicate+sess.invalid;
+}
+
+function resetSession() {
+  sess={success:0,duplicate:0,invalid:0}; updateCounters();
+  document.getElementById('scan-history').innerHTML='<div style="text-align:center;color:var(--text-muted);font-size:0.8rem;padding:1rem;">No scans yet this session</div>';
+  document.getElementById('result-display').innerHTML=`
+    <div style="background:#f8fafc;border:1.5px dashed var(--border-strong);border-radius:var(--radius-lg);
+                padding:2rem;text-align:center;color:var(--text-muted);">
+      <i class="bi bi-qr-code-scan" style="font-size:2.5rem;opacity:0.35;"></i>
+      <p style="margin-top:0.75rem;margin-bottom:0;font-size:0.85rem;">Scan result will appear here</p>
+    </div>`;
+}
+
+function playBeep() {
+  try {
+    const ctx=new AudioContext(), osc=ctx.createOscillator(), gain=ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(880,ctx.currentTime);
+    osc.frequency.setValueAtTime(1100,ctx.currentTime+0.1);
+    gain.gain.setValueAtTime(0.25,ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.35);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime+0.35);
+  } catch(e){}
+}
+function vibrate(p) { if (navigator.vibrate) navigator.vibrate(p); }
+function toggleManual() { const w=document.getElementById('manual-input-wrap'); w.style.display=w.style.display==='none'?'block':'none'; }
+function submitManual() { const v=document.getElementById('manual-qr-input').value.trim(); if(v){processQR(v);document.getElementById('manual-qr-input').value='';} }
+document.getElementById('manual-qr-input')?.addEventListener('keypress',e=>{if(e.key==='Enter')submitManual();});
+
+async function syncOfflineQueue() {
+  if (!offlineQueue.length) return;
+  try {
+    const resp=await fetch('{% url "sync_offline" %}',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},body:JSON.stringify({scans:offlineQueue})});
+    if(resp.ok){offlineQueue=[];localStorage.removeItem('vkc_offline_queue');document.getElementById('offline-count').textContent='';}
+  } catch(e){}
+}
+
+initCameras();
+if (offlineQueue.length) document.getElementById('offline-count').textContent=offlineQueue.length;
+</script>
+{% endblock %}

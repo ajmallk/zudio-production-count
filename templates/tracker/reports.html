@@ -1,0 +1,196 @@
+{% extends "tracker/base.html" %}
+{% block title %}Reports — VKC QR Tracker{% endblock %}
+{% block page_title %}<i class="bi bi-bar-chart me-2" style="color:var(--primary);"></i>Production Reports{% endblock %}
+
+{% block content %}
+
+<!-- Filter Bar -->
+<div class="card-light mb-4">
+  <form method="get" id="filter-form">
+    <div class="row g-3 align-items-end">
+      <div class="col-sm-6 col-md-3">
+        <label class="form-label">Period</label>
+        <select name="period" id="period-select" class="form-select" onchange="toggleCustomRange()">
+          <option value="day"    {% if period == 'day'    %}selected{% endif %}>Today</option>
+          <option value="week"   {% if period == 'week'   %}selected{% endif %}>This Week</option>
+          <option value="month"  {% if period == 'month'  %}selected{% endif %}>This Month</option>
+          <option value="year"   {% if period == 'year'   %}selected{% endif %}>This Year</option>
+          <option value="custom" {% if period == 'custom' %}selected{% endif %}>Custom Range</option>
+        </select>
+      </div>
+      <div class="col-sm-6 col-md-3 custom-range-field" {% if period != 'custom' %}style="display:none;"{% endif %}>
+        <label class="form-label">From</label>
+        <input type="date" name="date_from" class="form-control" value="{{ date_from }}" />
+      </div>
+      <div class="col-sm-6 col-md-3 custom-range-field" {% if period != 'custom' %}style="display:none;"{% endif %}>
+        <label class="form-label">To</label>
+        <input type="date" name="date_to" class="form-control" value="{{ date_to }}" />
+      </div>
+      <div class="col-sm-6 col-md-3">
+        <button type="submit" class="btn btn-primary-custom w-100">
+          <i class="bi bi-search me-1"></i>Apply Filter
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Export Buttons -->
+<div class="d-flex gap-2 mb-4 flex-wrap align-items-center">
+  <a href="{% url 'export_excel' %}?period={{ period }}&date_from={{ date_from }}&date_to={{ date_to }}"
+     class="btn" style="background:var(--success-light);border:1px solid #6ee7b7;color:var(--success);border-radius:var(--radius-sm);font-weight:600;padding:0.55rem 1.2rem;">
+    <i class="bi bi-file-earmark-excel me-2"></i>Export Excel
+  </a>
+  <a href="{% url 'export_pdf' %}?period={{ period }}&date_from={{ date_from }}&date_to={{ date_to }}"
+     class="btn" style="background:var(--danger-light);border:1px solid #fca5a5;color:var(--danger);border-radius:var(--radius-sm);font-weight:600;padding:0.55rem 1.2rem;">
+    <i class="bi bi-file-earmark-pdf me-2"></i>Export PDF
+  </a>
+  <div class="ms-auto" style="font-size:0.8rem;color:var(--text-muted);display:flex;align-items:center;gap:4px;">
+    <i class="bi bi-calendar3"></i>
+    {{ start_dt|date:"d M Y" }} — {{ end_dt|date:"d M Y" }}
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="card-light p-0 overflow-hidden">
+  <div style="border-bottom:1px solid var(--border);padding:0 1rem;background:#f8fafc;display:flex;gap:0;">
+    <a href="#" onclick="showTab('production')" id="tab-production"
+       style="padding:0.85rem 1.25rem;font-size:0.875rem;font-weight:600;text-decoration:none;
+              color:var(--primary);border-bottom:2px solid var(--primary);display:flex;align-items:center;gap:6px;">
+      <i class="bi bi-printer"></i>Production
+    </a>
+    <a href="#" onclick="showTab('stock')" id="tab-stock"
+       style="padding:0.85rem 1.25rem;font-size:0.875rem;font-weight:600;text-decoration:none;
+              color:var(--text-muted);border-bottom:2px solid transparent;display:flex;align-items:center;gap:6px;">
+      <i class="bi bi-boxes"></i>Stock
+    </a>
+    <a href="#" onclick="showTab('audit')" id="tab-audit"
+       style="padding:0.85rem 1.25rem;font-size:0.875rem;font-weight:600;text-decoration:none;
+              color:var(--text-muted);border-bottom:2px solid transparent;display:flex;align-items:center;gap:6px;">
+      <i class="bi bi-shield-check"></i>Audit Log
+    </a>
+  </div>
+
+  <!-- Production -->
+  <div id="pane-production" class="report-pane p-0">
+    {% if production_data %}
+    <div class="table-responsive">
+      <table class="table table-light-custom mb-0" style="margin:0;">
+        <thead><tr>
+          <th style="padding-left:1.5rem;">Date</th><th>Article Number</th><th>Size</th><th>QR Codes Printed</th>
+        </tr></thead>
+        <tbody>
+          {% for row in production_data %}
+          <tr>
+            <td style="padding-left:1.5rem;font-size:0.85rem;">{{ row.date }}</td>
+            <td><code style="color:var(--primary);background:var(--primary-light);padding:2px 6px;border-radius:4px;font-size:0.78rem;">{{ row.article }}</code></td>
+            <td><strong style="color:var(--text-primary);">{{ row.size }}</strong></td>
+            <td><span class="badge badge-primary" style="font-size:0.82rem;padding:0.28rem 0.7rem;">{{ row.printed }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-4" style="color:var(--text-muted);padding:2rem;">
+      <i class="bi bi-inbox" style="font-size:2rem;opacity:0.3;"></i>
+      <p class="mt-2 mb-0" style="font-size:0.85rem;">No production data for this period.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Stock -->
+  <div id="pane-stock" class="report-pane p-0" style="display:none;">
+    {% if stock_data %}
+    <div class="table-responsive">
+      <table class="table table-light-custom mb-0">
+        <thead><tr>
+          <th style="padding-left:1.5rem;">Article</th><th>Size</th><th>Printed</th><th>Scanned</th><th>Unscanned</th><th>Completion</th>
+        </tr></thead>
+        <tbody>
+          {% for row in stock_data %}
+          <tr>
+            <td style="padding-left:1.5rem;">
+              <code style="color:var(--primary);background:var(--primary-light);padding:2px 6px;border-radius:4px;font-size:0.78rem;">{{ row.article }}</code>
+            </td>
+            <td><strong style="color:var(--text-primary);">{{ row.size }}</strong></td>
+            <td><span class="badge badge-primary rounded-pill">{{ row.printed }}</span></td>
+            <td><span class="badge badge-success rounded-pill">{{ row.scanned }}</span></td>
+            <td><span class="badge badge-warning rounded-pill">{{ row.unscanned }}</span></td>
+            <td style="min-width:140px;">
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress flex-grow-1">
+                  <div class="progress-bar" style="width:{{ row.completion }}%;
+                    background:{% if row.completion >= 80 %}linear-gradient(90deg,var(--success),#10b981)
+                               {% elif row.completion >= 50 %}linear-gradient(90deg,var(--warning),#f59e0b)
+                               {% else %}linear-gradient(90deg,var(--danger),#e11d48){% endif %};"></div>
+                </div>
+                <span style="font-size:0.78rem;color:var(--text-muted);min-width:38px;">{{ row.completion }}%</span>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-4" style="color:var(--text-muted);padding:2rem;">
+      <i class="bi bi-inbox" style="font-size:2rem;opacity:0.3;"></i>
+      <p class="mt-2 mb-0" style="font-size:0.85rem;">No stock data available.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Audit Log -->
+  <div id="pane-audit" class="report-pane p-0" style="display:none;">
+    <div class="d-flex justify-content-between align-items-center" style="padding:0.75rem 1.5rem;border-bottom:1px solid var(--border);">
+      <span style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);">Showing {{ audit_data|length }} most recent events</span>
+    </div>
+    {% if audit_data %}
+    <div class="table-responsive">
+      <table class="table table-light-custom mb-0">
+        <thead><tr>
+          <th style="padding-left:1.5rem;">Timestamp</th><th>QR ID</th><th>Size</th><th>Article</th><th>Status</th><th>Device</th>
+        </tr></thead>
+        <tbody>
+          {% for row in audit_data %}
+          <tr>
+            <td style="padding-left:1.5rem;font-size:0.78rem;white-space:nowrap;">{{ row.timestamp }}</td>
+            <td><code style="font-size:0.68rem;color:var(--primary);">{{ row.qr_id|slice:":20" }}...</code></td>
+            <td><strong style="color:var(--text-primary);">{{ row.size }}</strong></td>
+            <td style="font-size:0.82rem;">{{ row.article }}</td>
+            <td>
+              {% if row.status == 'Success' %}<span class="badge badge-success">{{ row.status }}</span>
+              {% elif row.status == 'Already Scanned' %}<span class="badge badge-warning">{{ row.status }}</span>
+              {% else %}<span class="badge badge-danger">{{ row.status }}</span>{% endif %}
+            </td>
+            <td style="font-size:0.72rem;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ row.device }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-4" style="color:var(--text-muted);padding:2rem;">
+      <i class="bi bi-inbox" style="font-size:2rem;opacity:0.3;"></i>
+      <p class="mt-2 mb-0" style="font-size:0.85rem;">No scan events in this period.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function toggleCustomRange() {
+  const p=document.getElementById('period-select').value;
+  document.querySelectorAll('.custom-range-field').forEach(f=>{f.style.display=p==='custom'?'block':'none';});
+}
+function showTab(name) {
+  ['production','stock','audit'].forEach(t => {
+    document.getElementById('pane-'+t).style.display = t===name?'block':'none';
+    const tab=document.getElementById('tab-'+t);
+    if (t===name) { tab.style.color='var(--primary)'; tab.style.borderBottom='2px solid var(--primary)'; }
+    else          { tab.style.color='var(--text-muted)'; tab.style.borderBottom='2px solid transparent'; }
+  });
+}
+</script>
+{% endblock %}
