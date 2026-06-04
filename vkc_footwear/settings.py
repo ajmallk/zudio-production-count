@@ -57,16 +57,7 @@ WSGI_APPLICATION = 'vkc_footwear.wsgi.application'
 
 # Uses DATABASE_URL on Render, falls back to local PostgreSQL for dev
 DATABASES = {
-    'default': dj_database_url.config(
-        default=(
-            f"postgresql://{config('DB_USER', default='postgres')}:"
-            f"{config('DB_PASSWORD', default='673123')}@"
-            f"{config('DB_HOST', default='localhost')}:"
-            f"{config('DB_PORT', default='5432')}/"
-            f"{config('DB_NAME', default='vkc_footwear_db')}"
-        ),
-        conn_max_age=600,
-    )
+    'default': dj_database_url.parse(config('DATABASE_URL'))
 }
 
 AUTH_PASSWORD_VALIDATORS = [
