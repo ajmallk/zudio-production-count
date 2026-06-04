@@ -9,7 +9,7 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-vkc-footwear-qr-track
 
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', ['https://zudio-production-count.onrender.com'], cast=Csv())
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost,zudio-production-count.onrender.com', cast=Csv())
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -57,7 +57,9 @@ WSGI_APPLICATION = 'vkc_footwear.wsgi.application'
 
 # Uses DATABASE_URL on Render, falls back to local PostgreSQL for dev
 DATABASES = {
-    'default': dj_database_url.parse(config('DATABASE_URL'))
+    'default': dj_database_url.parse(
+        config('DATABASE_URL', default='postgresql://postgres:673123@localhost:5432/vkc_footwear_db')
+    )
 }
 
 AUTH_PASSWORD_VALIDATORS = [
