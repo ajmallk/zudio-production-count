@@ -1,0 +1,15 @@
+Django==6.0.4
+asgiref==3.11.1
+psycopg2-binary==2.9.12
+dj-database-url==3.1.2
+python-decouple==3.8
+whitenoise==6.12.0
+gunicorn==21.2.0
+pillow==12.2.0
+qrcode==8.2
+reportlab==4.5.1
+openpyxl==3.1.5
+pytesseract==0.3.13
+django-crispy-forms==2.6
+crispy-bootstrap5==2026.3
+djangorestframework==3.17.1
