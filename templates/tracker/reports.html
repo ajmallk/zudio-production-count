@@ -120,10 +120,7 @@
             <td style="min-width:140px;">
               <div class="d-flex align-items-center gap-2">
                 <div class="progress flex-grow-1">
-                  <div class="progress-bar" style="width:{{ row.completion }}%;
-                    background:{% if row.completion >= 80 %}linear-gradient(90deg,var(--success),#10b981)
-                               {% elif row.completion >= 50 %}linear-gradient(90deg,var(--warning),#f59e0b)
-                               {% else %}linear-gradient(90deg,var(--danger),#e11d48){% endif %};"></div>
+                  <div class="progress-bar completion-bar" data-pct="{{ row.completion }}" style="width:{{ row.completion }}%;"></div>
                 </div>
                 <span style="font-size:0.78rem;color:var(--text-muted);min-width:38px;">{{ row.completion }}%</span>
               </div>
@@ -192,5 +189,12 @@ function showTab(name) {
     else          { tab.style.color='var(--text-muted)'; tab.style.borderBottom='2px solid transparent'; }
   });
 }
+// Apply gradient colours to completion bars based on data-pct value
+document.querySelectorAll('.completion-bar').forEach(function(bar) {
+  var pct = parseInt(bar.dataset.pct, 10);
+  if (pct >= 80)      bar.style.background = 'linear-gradient(90deg,var(--success),#10b981)';
+  else if (pct >= 50) bar.style.background = 'linear-gradient(90deg,var(--warning),#f59e0b)';
+  else                bar.style.background = 'linear-gradient(90deg,var(--danger),#e11d48)';
+});
 </script>
 {% endblock %}

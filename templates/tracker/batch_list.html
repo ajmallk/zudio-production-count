@@ -36,16 +36,16 @@
             <span style="color:var(--text-muted);">{{ b.created_at|date:"H:i" }}</span>
           </td>
           <td style="font-size:0.85rem;color:var(--text-secondary);">{{ b.created_by.username|default:"—" }}</td>
-          <td><span class="badge badge-primary rounded-pill">{{ b.total_qr_count }}</span></td>
-          <td><span class="badge badge-success rounded-pill">{{ b.scanned_count }}</span></td>
-          <td><span class="badge badge-warning rounded-pill">{{ b.unscanned_count }}</span></td>
+          <td><span class="badge badge-primary rounded-pill">{{ b.total_qr }}</span></td>
+          <td><span class="badge badge-success rounded-pill">{{ b.scanned }}</span></td>
+          <td><span class="badge badge-warning rounded-pill">{{ b.total_qr|add:"-"|add:b.scanned }}</span></td>
           <td style="min-width:110px;">
-            {% if b.total_qr_count > 0 %}
+            {% if b.total_qr > 0 %}
             <div class="progress mb-1">
-              <div class="progress-bar" style="width:{% widthratio b.scanned_count b.total_qr_count 100 %}%; background:linear-gradient(90deg,var(--primary),#7c3aed);"></div>
+              <div class="progress-bar batch-bar" data-scanned="{{ b.scanned }}" data-total="{{ b.total_qr }}" style="background:linear-gradient(90deg,var(--primary),#7c3aed);"></div>
             </div>
-            <div style="font-size:0.7rem;color:var(--text-muted);">{% widthratio b.scanned_count b.total_qr_count 100 %}%</div>
-            {% endif %}
+            <div style="font-size:0.7rem;color:var(--text-muted);" class="batch-pct-label" data-scanned="{{ b.scanned }}" data-total="{{ b.total_qr }}"></div>
+          {% endif %}
           </td>
           <td>
             {% if b.is_printed %}
@@ -79,4 +79,20 @@
   </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Compute progress bar widths from data attributes (avoids Django widthratio in inline CSS)
+document.querySelectorAll('.batch-bar').forEach(function(bar) {
+  var scanned = parseInt(bar.dataset.scanned, 10) || 0;
+  var total   = parseInt(bar.dataset.total,   10) || 1;
+  bar.style.width = Math.round(scanned / total * 100) + '%';
+});
+document.querySelectorAll('.batch-pct-label').forEach(function(el) {
+  var scanned = parseInt(el.dataset.scanned, 10) || 0;
+  var total   = parseInt(el.dataset.total,   10) || 1;
+  el.textContent = Math.round(scanned / total * 100) + '%';
+});
+</script>
 {% endblock %}

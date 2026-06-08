@@ -117,13 +117,13 @@
   <div class="row g-2">
     {% for qr in qr_codes %}
     <div class="col-6 col-sm-4 col-md-3 col-lg-2">
-      <div style="background:{% if qr.is_scanned %}var(--success-light){% else %}#f8fafc{% endif %}; border:1px solid {% if qr.is_scanned %}#6ee7b7{% else %}var(--border){% endif %}; border-radius:var(--radius-md);padding:0.75rem;text-align:center;position:relative;transition:all 0.2s;">
+      <div class="qr-card" data-scanned="{% if qr.is_scanned %}1{% else %}0{% endif %}" style="border-radius:var(--radius-md);padding:0.75rem;text-align:center;position:relative;transition:all 0.2s;">
         {% if qr.is_scanned %}
         <div style="position:absolute;top:6px;right:6px;background:var(--success);color:white;
-                    border-radius:4px;padding:1px 5px;font-size:0.58rem;font-weight:700;">✓ DONE</div>
+                    border-radius:4px;padding:1px 5px;font-size:0.58rem;font-weight:700;">&#10003; DONE</div>
         {% endif %}
         {% if qr.qr_image %}
-        <img src="{{ qr.qr_image.url }}" alt="QR Size {{ qr.size }}" style="width:100%;border-radius:6px;{% if qr.is_scanned %}opacity:0.6;{% endif %}" />
+        <img src="{{ qr.qr_image.url }}" alt="QR Size {{ qr.size }}" class="qr-img" data-scanned="{% if qr.is_scanned %}1{% else %}0{% endif %}" style="width:100%;border-radius:6px;" />
         {% else %}
         <div style="width:100%;aspect-ratio:1;background:var(--primary-light);border-radius:6px;
                     display:flex;align-items:center;justify-content:center;color:var(--primary);">
@@ -143,4 +143,24 @@
   </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Apply scanned/unscanned card styles from data attributes (avoids Django tags in CSS)
+document.querySelectorAll('.qr-card').forEach(function(card) {
+  if (card.dataset.scanned === '1') {
+    card.style.background = 'var(--success-light)';
+    card.style.border = '1px solid #6ee7b7';
+  } else {
+    card.style.background = '#f8fafc';
+    card.style.border = '1px solid var(--border)';
+  }
+});
+document.querySelectorAll('.qr-img').forEach(function(img) {
+  if (img.dataset.scanned === '1') {
+    img.style.opacity = '0.6';
+  }
+});
+</script>
 {% endblock %}

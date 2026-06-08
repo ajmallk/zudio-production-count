@@ -11,6 +11,8 @@ from django.views.decorators.http import require_POST, require_GET
 from django.utils import timezone
 from django.db.models import Count, Q, Sum
 from django.contrib.auth import authenticate, login, logout
+from django.db import transaction
+from django.db.models import Count, Q, Sum, F
 
 from .models import ProductionBatch, QRCode, ScanEvent, OrderItem, ARTICLE_SIZE_MAP
 from .forms import OrderItemForm, BatchNotesForm, OCRUploadForm, DateRangeFilterForm
@@ -46,46 +48,79 @@ def logout_view(request):
 # ─────────────────────────────────────────────────────
 @login_required
 def dashboard(request):
-    total_printed = QRCode.objects.count()
-    total_scanned = QRCode.objects.filter(is_scanned=True).count()
+    # Single aggregate query instead of 3 separate counts
+    qr_agg = QRCode.objects.aggregate(
+        total_printed=Count('id'),
+        total_scanned=Count('id', filter=Q(is_scanned=True)),
+    )
+    total_printed  = qr_agg['total_printed'] or 0
+    total_scanned  = qr_agg['total_scanned'] or 0
     total_unscanned = total_printed - total_scanned
 
-    # Recent batches
-    recent_batches = ProductionBatch.objects.all()[:8]
+    # Recent batches — annotate counts in ONE query to avoid N+1 @property queries
+    recent_batches = (
+        ProductionBatch.objects
+        .select_related('created_by')
+        .annotate(
+            total_qr=Count('qrcodes'),
+            scanned=Count('qrcodes', filter=Q(qrcodes__is_scanned=True)),
+        )
+        .order_by('-created_at')[:8]
+    )
 
-    # Breakdown by article/size
+    # Breakdown by article/size — ONE query with GROUP BY instead of N*2 queries
+    size_stats = {
+        row['size']: row
+        for row in QRCode.objects.values('size').annotate(
+            printed=Count('id'),
+            scanned=Count('id', filter=Q(is_scanned=True)),
+        )
+    }
     breakdown = []
     for size, article in sorted(ARTICLE_SIZE_MAP.items()):
-        printed = QRCode.objects.filter(size=size).count()
-        scanned = QRCode.objects.filter(size=size, is_scanned=True).count()
-        if printed > 0:
+        row = size_stats.get(size)
+        if row and row['printed'] > 0:
             breakdown.append({
-                'size': size,
-                'article': article,
-                'printed': printed,
-                'scanned': scanned,
-                'unscanned': printed - scanned,
-                'pct': round(scanned / printed * 100, 1),
+                'size':     size,
+                'article':  article,
+                'printed':  row['printed'],
+                'scanned':  row['scanned'],
+                'unscanned': row['printed'] - row['scanned'],
+                'pct':      round(row['scanned'] / row['printed'] * 100, 1),
             })
 
-    # Today's stats
+    # Today's stats — combined into one query
     today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    today_printed = QRCode.objects.filter(created_at__gte=today_start).count()
-    today_scanned = QRCode.objects.filter(is_scanned=True, scanned_at__gte=today_start).count()
+    today_agg = QRCode.objects.aggregate(
+        today_printed=Count('id', filter=Q(created_at__gte=today_start)),
+        today_scanned=Count('id', filter=Q(is_scanned=True, scanned_at__gte=today_start)),
+    )
+    today_printed = today_agg['today_printed'] or 0
+    today_scanned = today_agg['today_scanned'] or 0
 
-    # Recent scans
-    recent_scans = ScanEvent.objects.select_related('qr_code').order_by('-scanned_at')[:10]
+    # Recent scans with prefetched relations to avoid N+1
+    recent_scans = (
+        ScanEvent.objects
+        .select_related('qr_code', 'qr_code__batch', 'scanned_by')
+        .only('scanned_at', 'status', 'qr_data_raw',
+              'qr_code__size', 'qr_code__article_number',
+              'qr_code__batch__batch_id',
+              'scanned_by__username')
+        .order_by('-scanned_at')[:10]
+    )
 
     context = {
-        'total_printed': total_printed,
-        'total_scanned': total_scanned,
+        'total_printed':   total_printed,
+        'total_scanned':   total_scanned,
         'total_unscanned': total_unscanned,
-        'today_printed': today_printed,
-        'today_scanned': today_scanned,
-        'recent_batches': recent_batches,
-        'breakdown': breakdown,
-        'recent_scans': recent_scans,
-        'completion_pct': round(total_scanned / total_printed * 100, 1) if total_printed > 0 else 0,
+        'today_printed':   today_printed,
+        'today_scanned':   today_scanned,
+        'recent_batches':  recent_batches,
+        'breakdown':       breakdown,
+        'recent_scans':    recent_scans,
+        'completion_pct':  round(total_scanned / total_printed * 100, 1) if total_printed > 0 else 0,
+        # pass annotated field names so the template uses them instead of @property calls
+        'batch_use_annotated': True,
     }
     return render(request, 'tracker/dashboard.html', context)
 
@@ -256,7 +291,16 @@ def print_batch(request, batch_id):
 
 @login_required
 def batch_list(request):
-    batches = ProductionBatch.objects.all()
+    """All batches — annotated in a single SQL query to kill N+1 @property queries."""
+    batches = (
+        ProductionBatch.objects
+        .select_related('created_by')
+        .annotate(
+            total_qr=Count('qrcodes'),
+            scanned=Count('qrcodes', filter=Q(qrcodes__is_scanned=True)),
+        )
+        .order_by('-created_at')
+    )
     return render(request, 'tracker/batch_list.html', {'batches': batches})
 
 
@@ -271,7 +315,7 @@ def scanner(request):
 @login_required
 @require_POST
 def process_scan(request):
-    """Process a scanned QR code"""
+    """Process a scanned QR code — optimised with atomic update to prevent duplicate scans."""
     try:
         data = json.loads(request.body)
         qr_string = data.get('qr_data', '').strip()
@@ -282,9 +326,12 @@ def process_scan(request):
     if not qr_string:
         return JsonResponse({'status': 'invalid', 'message': 'Empty QR data'})
 
-    # Try to find QR by qr_data field
+    # Try to find QR by qr_data field (indexed)
     try:
-        qr_obj = QRCode.objects.get(qr_data=qr_string)
+        qr_obj = QRCode.objects.only(
+            'id', 'qr_id', 'qr_data', 'is_scanned', 'scanned_at',
+            'size', 'article_number', 'batch_id',
+        ).get(qr_data=qr_string)
     except QRCode.DoesNotExist:
         # Log invalid scan
         ScanEvent.objects.create(
@@ -296,7 +343,7 @@ def process_scan(request):
         )
         return JsonResponse({
             'status': 'invalid',
-            'message': '❌ Invalid QR Code — not found in system',
+            'message': '\u274c Invalid QR Code — not found in system',
         })
 
     if qr_obj.is_scanned:
@@ -309,17 +356,39 @@ def process_scan(request):
         )
         return JsonResponse({
             'status': 'already_scanned',
-            'message': f'⚠️ Already Scanned',
+            'message': f'\u26a0\ufe0f Already Scanned',
             'scanned_at': qr_obj.scanned_at.strftime('%d %b %Y %H:%M:%S') if qr_obj.scanned_at else '',
             'size': qr_obj.size,
             'article': qr_obj.article_number,
         })
 
-    # Mark as scanned
-    qr_obj.is_scanned = True
-    qr_obj.scanned_at = timezone.now()
-    qr_obj.scanned_by_device = device_info[:200]
-    qr_obj.save()
+    # Atomic update — avoids race conditions & saves a round-trip vs .save()
+    now = timezone.now()
+    updated = QRCode.objects.filter(
+        id=qr_obj.id, is_scanned=False  # guard against concurrent scans
+    ).update(
+        is_scanned=True,
+        scanned_at=now,
+        scanned_by_device=device_info[:200],
+    )
+
+    if updated == 0:
+        # Another request already scanned it between our read and update
+        qr_obj.refresh_from_db(fields=['scanned_at'])
+        ScanEvent.objects.create(
+            qr_code=qr_obj,
+            status='already_scanned',
+            qr_data_raw=qr_string[:500],
+            device_info=device_info,
+            scanned_by=request.user,
+        )
+        return JsonResponse({
+            'status': 'already_scanned',
+            'message': '\u26a0\ufe0f Already Scanned',
+            'scanned_at': qr_obj.scanned_at.strftime('%d %b %Y %H:%M:%S') if qr_obj.scanned_at else '',
+            'size': qr_obj.size,
+            'article': qr_obj.article_number,
+        })
 
     ScanEvent.objects.create(
         qr_code=qr_obj,
@@ -329,18 +398,27 @@ def process_scan(request):
         scanned_by=request.user,
     )
 
-    # Live count for this size
-    size_scanned = QRCode.objects.filter(size=qr_obj.size, is_scanned=True).count()
-    size_total = QRCode.objects.filter(size=qr_obj.size).count()
+    # Live count for this size — uses the composite index (size, is_scanned)
+    size_counts = QRCode.objects.filter(size=qr_obj.size).aggregate(
+        size_scanned=Count('id', filter=Q(is_scanned=True)),
+        size_total=Count('id'),
+    )
+
+    batch_id = (
+        ProductionBatch.objects
+        .filter(id=qr_obj.batch_id)
+        .values_list('batch_id', flat=True)
+        .first() or ''
+    )
 
     return JsonResponse({
         'status': 'success',
-        'message': f'✅ +1 Added — Size {qr_obj.size}',
-        'size': qr_obj.size,
-        'article': qr_obj.article_number,
-        'batch': qr_obj.batch.batch_id,
-        'size_scanned': size_scanned,
-        'size_total': size_total,
+        'message': f'\u2705 +1 Added — Size {qr_obj.size}',
+        'size':         qr_obj.size,
+        'article':      qr_obj.article_number,
+        'batch':        batch_id,
+        'size_scanned': size_counts['size_scanned'],
+        'size_total':   size_counts['size_total'],
     })
 
 
@@ -468,11 +546,16 @@ def sync_offline_scans(request):
 # ─────────────────────────────────────────────────────
 @login_required
 def live_stats(request):
-    total_printed = QRCode.objects.count()
-    total_scanned = QRCode.objects.filter(is_scanned=True).count()
+    # Single aggregate instead of two separate COUNT queries
+    agg = QRCode.objects.aggregate(
+        total_printed=Count('id'),
+        total_scanned=Count('id', filter=Q(is_scanned=True)),
+    )
+    total_printed = agg['total_printed'] or 0
+    total_scanned = agg['total_scanned'] or 0
     return JsonResponse({
-        'total_printed': total_printed,
-        'total_scanned': total_scanned,
+        'total_printed':  total_printed,
+        'total_scanned':  total_scanned,
         'total_unscanned': total_printed - total_scanned,
         'completion_pct': round(total_scanned / total_printed * 100, 1) if total_printed else 0,
     })

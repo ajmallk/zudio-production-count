@@ -61,6 +61,11 @@ class QRCode(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['is_scanned'], name='qr_is_scanned_idx'),
+            models.Index(fields=['size', 'is_scanned'], name='qr_size_scanned_idx'),
+            models.Index(fields=['qr_data'], name='qr_data_idx'),
+        ]
 
 
 class ScanEvent(models.Model):
@@ -83,6 +88,11 @@ class ScanEvent(models.Model):
 
     class Meta:
         ordering = ['-scanned_at']
+        indexes = [
+            models.Index(fields=['status'], name='scan_status_idx'),
+            models.Index(fields=['scanned_at'], name='scan_at_idx'),
+            models.Index(fields=['qr_code', 'status'], name='scan_qr_status_idx'),
+        ]
 
 
 class OrderItem(models.Model):

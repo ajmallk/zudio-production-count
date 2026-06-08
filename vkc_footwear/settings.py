@@ -27,6 +27,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'django.middleware.gzip.GZipMiddleware',          # compress HTML/JSON responses
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -37,11 +38,16 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'vkc_footwear.urls'
 
+_TEMPLATE_LOADERS = [
+    'django.template.loaders.filesystem.Loader',
+    'django.template.loaders.app_directories.Loader',
+]
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
+        'APP_DIRS': False,  # must be False when using loaders explicitly
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
@@ -49,18 +55,28 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+            # Use cached loader in production only — avoids stale-cache issues in DEBUG mode
+            'loaders': [
+                ('django.template.loaders.cached.Loader', _TEMPLATE_LOADERS)
+            ] if not DEBUG else _TEMPLATE_LOADERS,
         },
     },
 ]
 
 WSGI_APPLICATION = 'vkc_footwear.wsgi.application'
 
-# Uses DATABASE_URL on Render, falls back to local PostgreSQL for dev
-DATABASES = {
-    'default': dj_database_url.parse(
-        config('DATABASE_URL', default='postgresql://postgres:673123@localhost:5432/vkc_footwear_db')
+# Uses DATABASE_URL from environment (set by Render in production).
+# Locally: set DATABASE_URL in .env if you want to test against a local PostgreSQL.
+_DATABASE_URL = config('DATABASE_URL', default='')
+if not _DATABASE_URL:
+    raise Exception(
+        "DATABASE_URL is not set. Add it to your .env for local dev, "
+        "or ensure the Render environment variable is configured."
     )
-}
+_db_config = dj_database_url.parse(_DATABASE_URL)
+_db_config.setdefault('CONN_MAX_AGE', 60)        # persistent connections — avoids per-request TCP handshake
+_db_config.setdefault('CONN_HEALTH_CHECKS', True) # recycle stale connections automatically
+DATABASES = {'default': _db_config}
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -77,7 +93,15 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Use new STORAGES dict API (Django 4.2+); suppress deprecation warning from old STATICFILES_STORAGE
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -93,4 +117,7 @@ LOGOUT_REDIRECT_URL = '/login/'
 
 # Session settings
 SESSION_COOKIE_AGE = 86400  # 24 hours
-SESSION_SAVE_EVERY_REQUEST = True
+SESSION_SAVE_EVERY_REQUEST = False  # Only save when session data actually changes (was True = DB write on EVERY request)
+
+# GZip all responses — reduces bandwidth for HTML/JSON on slow networks
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5 MB upload limit

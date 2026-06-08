@@ -93,8 +93,8 @@
                 <span style="font-size:0.8rem;color:var(--primary);font-weight:600;">{{ b.batch_id }}</span><br>
                 <span style="font-size:0.7rem;color:var(--text-muted);">{{ b.created_at|date:"d M Y H:i" }}</span>
               </td>
-              <td><span class="badge badge-primary rounded-pill">{{ b.total_qr_count }}</span></td>
-              <td><span class="badge badge-success rounded-pill">{{ b.scanned_count }}</span></td>
+              <td><span class="badge badge-primary rounded-pill">{{ b.total_qr }}</span></td>
+              <td><span class="badge badge-success rounded-pill">{{ b.scanned }}</span></td>
               <td>
                 {% if b.is_printed %}
                   <span class="badge badge-success" style="font-size:0.7rem;">Printed</span>
