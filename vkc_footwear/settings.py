@@ -27,7 +27,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'django.middleware.gzip.GZipMiddleware',          # compress HTML/JSON responses
+    'django.middleware.gzip.GZipMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -47,7 +47,7 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': False,  # must be False when using loaders explicitly
+        'APP_DIRS': False,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
@@ -55,7 +55,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
-            # Use cached loader in production only — avoids stale-cache issues in DEBUG mode
+            # Cached loader only in production — avoids stale-cache in DEBUG mode
             'loaders': [
                 ('django.template.loaders.cached.Loader', _TEMPLATE_LOADERS)
             ] if not DEBUG else _TEMPLATE_LOADERS,
@@ -65,18 +65,19 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'vkc_footwear.wsgi.application'
 
-# Uses DATABASE_URL from environment (set by Render in production).
-# Locally: set DATABASE_URL in .env if you want to test against a local PostgreSQL.
-_DATABASE_URL = config('DATABASE_URL', default='')
-if not _DATABASE_URL:
-    raise Exception(
-        "DATABASE_URL is not set. Add it to your .env for local dev, "
-        "or ensure the Render environment variable is configured."
-    )
+# ─── DATABASE ────────────────────────────────────────────────────────────────
+# On Render: DATABASE_URL is set automatically by the linked PostgreSQL service.
+# Locally:   Set DATABASE_URL in .env pointing to your local PostgreSQL.
+# Never falls back to SQLite.
+_DATABASE_URL = config(
+    'DATABASE_URL',
+    default='postgresql://postgres:673123@localhost:5432/vkc_footwear_db'
+)
 _db_config = dj_database_url.parse(_DATABASE_URL)
-_db_config.setdefault('CONN_MAX_AGE', 60)        # persistent connections — avoids per-request TCP handshake
-_db_config.setdefault('CONN_HEALTH_CHECKS', True) # recycle stale connections automatically
+_db_config['CONN_MAX_AGE'] = 60         # persistent connections
+_db_config['CONN_HEALTH_CHECKS'] = True  # auto-recycle stale connections
 DATABASES = {'default': _db_config}
+# ─────────────────────────────────────────────────────────────────────────────
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -93,7 +94,8 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-# Use new STORAGES dict API (Django 4.2+); suppress deprecation warning from old STATICFILES_STORAGE
+
+# New STORAGES dict API (Django 4.2+) — replaces deprecated STATICFILES_STORAGE
 STORAGES = {
     'default': {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',
@@ -115,9 +117,7 @@ LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/login/'
 
-# Session settings
-SESSION_COOKIE_AGE = 86400  # 24 hours
-SESSION_SAVE_EVERY_REQUEST = False  # Only save when session data actually changes (was True = DB write on EVERY request)
+SESSION_COOKIE_AGE = 86400       # 24 hours
+SESSION_SAVE_EVERY_REQUEST = False
 
-# GZip all responses — reduces bandwidth for HTML/JSON on slow networks
 DATA_UPLOAD_MAX_MEMORY_SIZE = 5242880  # 5 MB upload limit
