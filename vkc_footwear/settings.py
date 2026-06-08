@@ -69,14 +69,9 @@ WSGI_APPLICATION = 'vkc_footwear.wsgi.application'
 # On Render: DATABASE_URL is set automatically by the linked PostgreSQL service.
 # Locally:   Set DATABASE_URL in .env pointing to your local PostgreSQL.
 # Never falls back to SQLite.
-_DATABASE_URL = config(
-    'DATABASE_URL',
-    default='postgresql://postgres:673123@localhost:5432/vkc_footwear_db'
-)
-_db_config = dj_database_url.parse(_DATABASE_URL)
-_db_config['CONN_MAX_AGE'] = 60         # persistent connections
-_db_config['CONN_HEALTH_CHECKS'] = True  # auto-recycle stale connections
-DATABASES = {'default': _db_config}
+DATABASES = {
+    'default': dj_database_url.parse(config('DATABASE_URL'))
+}
 # ─────────────────────────────────────────────────────────────────────────────
 
 AUTH_PASSWORD_VALIDATORS = [
