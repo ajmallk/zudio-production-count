@@ -11,7 +11,7 @@ SECRET_KEY = config(
     default='django-insecure-vkc-footwear-qr-tracking-system-2026-secret-key'
 )
 
-DEBUG = config('DEBUG', default=False, cast=bool)
+DEBUG = True
 
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
