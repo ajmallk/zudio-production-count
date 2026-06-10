@@ -59,13 +59,6 @@
 }
 @keyframes slideIn { from{opacity:0;transform:translateX(-8px);}to{opacity:1;transform:translateX(0);} }
 
-.article-chip {
-  background: var(--primary-light);
-  border: 1px solid rgba(79,70,229,0.2);
-  border-radius: var(--radius-sm);
-  padding: 0.6rem 0.9rem;
-}
-
 .ocr-zone {
   border: 2px dashed var(--border-strong);
   border-radius: var(--radius-lg);
@@ -109,26 +102,52 @@
     <div class="card-light mb-4">
       <div class="section-header"><i class="bi bi-pencil-square me-1"></i>Manual Entry</div>
 
-      <div class="mb-3">
-        <label class="form-label">Select Size</label>
-        <div class="d-flex flex-wrap gap-2" id="size-buttons">
-          {% for size in size_choices %}
-          <button type="button" class="size-btn" onclick="selectSize({{ size }})">{{ size }}</button>
-          {% endfor %}
-        </div>
-      </div>
-
-      <div id="article-display" style="display:none;" class="mb-3">
-        <div class="article-chip">
-          <div style="font-size:0.72rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Auto-filled Article Number</div>
-          <div id="article-value" style="font-size:1rem;font-weight:700;color:var(--primary);font-family:monospace;margin-top:2px;"></div>
-        </div>
-      </div>
-
       <form method="post" id="add-form" action="{% url 'create_order' %}">
         {% csrf_token %}
         <input type="hidden" name="action" value="add_item" />
+        <!-- Size is passed as hidden field — still driven by size buttons below -->
         <input type="hidden" name="size" id="selected-size" value="" />
+
+        <!-- Size Buttons (visual selector — no longer a typed field) -->
+        <div class="mb-3">
+          <label class="form-label">Select Size <span style="color:var(--danger);font-size:0.75rem;">*</span></label>
+          <div class="d-flex flex-wrap gap-2" id="size-buttons">
+            {% for size in size_choices %}
+            <button type="button" class="size-btn" onclick="selectSize({{ size }})">{{ size }}</button>
+            {% endfor %}
+          </div>
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:5px;">
+            <i class="bi bi-hand-index me-1"></i>Click a size button to select it.
+          </div>
+        </div>
+
+        <!-- Article Number — strict manual entry, no auto-fill -->
+        <div class="mb-3">
+          <label class="form-label">Article Number <span style="color:var(--danger);font-size:0.75rem;">*</span></label>
+          <input type="text" name="article_number" id="article-number-input"
+                 class="form-control"
+                 style="font-family:monospace;letter-spacing:0.5px;"
+                 maxlength="30"
+                 placeholder="Type article number manually"
+                 autocomplete="off"
+                 required />
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">
+            <i class="bi bi-keyboard me-1"></i>Enter the article number manually. This field does not auto-fill.
+          </div>
+        </div>
+
+        <!-- Name / Label — REQUIRED -->
+        <div class="mb-3">
+          <label class="form-label">Name / Label <span style="color:var(--danger);font-size:0.75rem;">*</span></label>
+          <input type="text" name="name" id="name-input"
+                 class="form-control"
+                 maxlength="100"
+                 placeholder="e.g. VKC Chappals Model A"
+                 required />
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;">
+            <i class="bi bi-tag me-1"></i>This name will be printed prominently on each QR code label.
+          </div>
+        </div>
 
         <div class="mb-3">
           <label class="form-label">Quantity</label>
@@ -144,7 +163,7 @@
           </div>
         </div>
 
-        <button type="submit" class="btn btn-primary-custom w-100" id="add-btn" disabled>
+        <button type="submit" class="btn btn-primary-custom w-100" id="add-btn" onclick="return validateForm()">
           <i class="bi bi-plus-circle me-2"></i>Add to Order
         </button>
       </form>
@@ -158,7 +177,7 @@
       </p>
       <div class="ocr-zone" id="ocr-zone" onclick="document.getElementById('ocr-file').click()">
         <i class="bi bi-cloud-upload" style="font-size:2.5rem;color:var(--primary);opacity:0.6;"></i>
-        <p style="color:var(--text-muted);margin-top:0.5rem;font-size:0.85rem;margin-bottom:0;">Click or drag & drop an image here</p>
+        <p style="color:var(--text-muted);margin-top:0.5rem;font-size:0.85rem;margin-bottom:0;">Click or drag &amp; drop an image here</p>
         <input type="file" id="ocr-file" accept="image/*" style="display:none;" onchange="handleOCR(this)" />
       </div>
       <div id="ocr-result" style="display:none;" class="mt-3"></div>
@@ -188,6 +207,9 @@
           <div>
             <div style="font-size:1rem;font-weight:700;color:var(--text-primary);">Size {{ item.size }}</div>
             <div style="font-size:0.72rem;color:var(--text-muted);font-family:monospace;">{{ item.article }}</div>
+            {% if item.name %}
+            <div style="font-size:0.75rem;color:var(--primary);margin-top:2px;font-weight:600;"><i class="bi bi-tag me-1"></i>{{ item.name }}</div>
+            {% endif %}
           </div>
           <div class="d-flex align-items-center gap-3">
             <div style="text-align:right;">
@@ -217,7 +239,7 @@
             <span style="font-size:1.2rem;font-weight:800;color:var(--primary);">{{ total_qty }}</span>
           </div>
           <a href="{% url 'review_order' %}" class="btn btn-accent w-100 btn-lg">
-            <i class="bi bi-arrow-right-circle me-2"></i>Review & Generate QR
+            <i class="bi bi-arrow-right-circle me-2"></i>Review &amp; Generate QR
           </a>
         </div>
       {% else %}
@@ -233,17 +255,11 @@
 
 {% block extra_js %}
 <script>
-const articleMap = {{ article_map_json|safe }};
-let selectedSize = null;
-
+// Size selection — only highlights button and sets hidden field
 function selectSize(size) {
-  selectedSize = size;
   document.getElementById('selected-size').value = size;
-  document.getElementById('article-value').textContent = articleMap[size] || 'N/A';
-  document.getElementById('article-display').style.display = 'block';
-  document.getElementById('add-btn').disabled = false;
   document.querySelectorAll('.size-btn').forEach(b => {
-    b.classList.toggle('selected', b.textContent.trim() == size);
+    b.classList.toggle('selected', parseInt(b.textContent.trim()) === size);
   });
 }
 
@@ -251,6 +267,28 @@ function adjustQty(delta) {
   const input = document.getElementById('qty-input');
   const val = parseInt(input.value) || 1;
   input.value = Math.max(1, Math.min(10000, val + delta));
+}
+
+// Client-side validation before submit
+function validateForm() {
+  const size    = document.getElementById('selected-size').value;
+  const article = document.getElementById('article-number-input').value.trim();
+  const name    = document.getElementById('name-input').value.trim();
+  if (!size) {
+    alert('Please select a size by clicking one of the size buttons.');
+    return false;
+  }
+  if (!article) {
+    alert('Article Number is required. Please type it manually.');
+    document.getElementById('article-number-input').focus();
+    return false;
+  }
+  if (!name) {
+    alert('Name / Label is required.');
+    document.getElementById('name-input').focus();
+    return false;
+  }
+  return true;
 }
 
 function handleOCR(input) {
@@ -272,8 +310,8 @@ function handleOCR(input) {
             <div style="color:var(--success);font-weight:600;margin-bottom:0.5rem;"><i class="bi bi-check-circle me-1"></i>Extracted Successfully!</div>
             <div style="font-size:0.85rem;color:var(--text-primary);">Article: <strong>${d.article}</strong></div>
             <div style="font-size:0.85rem;color:var(--text-primary);">Size: <strong>${d.size}</strong></div>
-            <button class="btn btn-sm mt-2 btn-primary-custom" onclick="selectSize(${d.size})">
-              <i class="bi bi-arrow-right me-1"></i>Use This Size
+            <button class="btn btn-sm mt-2 btn-primary-custom" onclick="selectSize(${d.size}); document.getElementById('article-number-input').value='${d.article}';">
+              <i class="bi bi-arrow-right me-1"></i>Use This Data
             </button>
           </div>`;
       } else {

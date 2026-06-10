@@ -10,6 +10,27 @@ class OrderItemForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-select', 'id': 'size-select'}),
         label='Size'
     )
+    article_number = forms.CharField(
+        max_length=30,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'id': 'article-number-input',
+            'placeholder': 'Article number (auto-filled or enter manually)',
+            'style': 'font-family:monospace; letter-spacing:0.5px;',
+        }),
+        label='Article Number'
+    )
+    name = forms.CharField(
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'id': 'name-input',
+            'placeholder': 'e.g. VKC Chappals Model A (optional)',
+        }),
+        label='Name / Label'
+    )
     quantity = forms.IntegerField(
         min_value=1,
         max_value=10000,
@@ -36,6 +57,7 @@ class OCRUploadForm(forms.Form):
 
 class DateRangeFilterForm(forms.Form):
     PERIOD_CHOICES = [
+        ('hour', 'Last Hour'),
         ('day', 'Today'),
         ('week', 'This Week'),
         ('month', 'This Month'),

@@ -1,0 +1,332 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }} | VKC Admin{% endblock %}
+
+{% block branding %}
+<div id="site-name" style="display:flex;align-items:center;gap:12px;">
+  <div style="width:36px;height:36px;background:linear-gradient(135deg,#4f46e5,#7c3aed);
+              border-radius:10px;display:flex;align-items:center;justify-content:center;
+              box-shadow:0 2px 8px rgba(79,70,229,0.4);">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"
+         stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+      <rect x="3" y="14" width="7" height="7"/>
+      <circle cx="17.5" cy="17.5" r="2.5"/>
+    </svg>
+  </div>
+  <div>
+    <div style="font-size:1rem;font-weight:800;color:#fff;letter-spacing:-0.3px;line-height:1.1;">VKC QR Tracker</div>
+    <div style="font-size:0.65rem;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:1px;font-weight:600;">Admin Panel</div>
+  </div>
+</div>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary:      #4f46e5;
+    --primary-dark: #3730a3;
+    --accent:       #7c3aed;
+    --success:      #10b981;
+    --warning:      #f59e0b;
+    --danger:       #ef4444;
+    --bg:           #f1f5f9;
+    --card:         #ffffff;
+    --border:       #e2e8f0;
+    --text:         #1e293b;
+    --text-muted:   #64748b;
+    --radius:       10px;
+  }
+
+  /* ── Global ── */
+  * { box-sizing: border-box; }
+  body, input, select, textarea, button {
+    font-family: 'Inter', system-ui, sans-serif !important;
+  }
+  body { background: var(--bg) !important; color: var(--text) !important; }
+
+  /* ── Header ── */
+  #header {
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4f46e5 100%) !important;
+    box-shadow: 0 2px 16px rgba(79,70,229,0.3) !important;
+    padding: 0 24px !important;
+    height: 60px !important;
+    display: flex !important;
+    align-items: center !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 100 !important;
+  }
+  #header a:link, #header a:visited { color: rgba(255,255,255,0.85) !important; }
+  #header a:hover { color: #fff !important; }
+  #user-tools { font-size: 0.78rem !important; }
+  #user-tools a {
+    color: rgba(255,255,255,0.8) !important;
+    text-decoration: none !important;
+    padding: 4px 10px !important;
+    border-radius: 6px !important;
+    transition: background 0.2s !important;
+  }
+  #user-tools a:hover { background: rgba(255,255,255,0.15) !important; color: #fff !important; }
+
+  /* ── Breadcrumbs ── */
+  div.breadcrumbs {
+    background: var(--card) !important;
+    border-bottom: 1px solid var(--border) !important;
+    padding: 10px 24px !important;
+    font-size: 0.8rem !important;
+    color: var(--text-muted) !important;
+  }
+  div.breadcrumbs a { color: var(--primary) !important; text-decoration: none !important; }
+  div.breadcrumbs a:hover { text-decoration: underline !important; }
+
+  /* ── Main content wrapper ── */
+  #content-main { padding: 0 !important; }
+  #content { padding: 24px !important; }
+
+  /* ── Module / App headings ── */
+  .app-vkc_tracker .section, .app-auth .section, .app-auth_token .section { }
+  h1.page-title, h1 {
+    font-size: 1.4rem !important;
+    font-weight: 800 !important;
+    color: var(--text) !important;
+    margin-bottom: 1rem !important;
+  }
+
+  /* ── Dashboard app cards ── */
+  #content-main .app-tracker, #content-main .app-auth {
+    background: var(--card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05) !important;
+    margin-bottom: 1.25rem !important;
+    overflow: hidden !important;
+  }
+
+  /* ── App caption (e.g. "TRACKER | AUTH") ── */
+  .app-tracker caption, .app-auth caption,
+  .app-tracker .section > caption, table caption {
+    background: linear-gradient(90deg, var(--primary), var(--accent)) !important;
+    color: #fff !important;
+    font-size: 0.7rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1.2px !important;
+    padding: 8px 16px !important;
+  }
+
+  /* ── Module headers ── */
+  .module h2, .module caption, .inline-group h2 {
+    background: linear-gradient(90deg, var(--primary), var(--accent)) !important;
+    color: #fff !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    padding: 10px 16px !important;
+    border-radius: 0 !important;
+  }
+
+  /* ── Tables ── */
+  #result_list, table {
+    border-radius: var(--radius) !important;
+    overflow: hidden !important;
+    border: 1px solid var(--border) !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    width: 100% !important;
+  }
+  #result_list thead th {
+    background: #f8fafc !important;
+    color: var(--text-muted) !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.6px !important;
+    padding: 10px 12px !important;
+    border-bottom: 2px solid var(--border) !important;
+  }
+  #result_list thead th a, #result_list thead th a:visited {
+    color: var(--text-muted) !important;
+  }
+  #result_list thead th.sorted a { color: var(--primary) !important; }
+  #result_list tbody tr { transition: background 0.15s !important; }
+  #result_list tbody tr:nth-child(even) { background: #f8fafc !important; }
+  #result_list tbody tr:hover { background: #eef2ff !important; }
+  #result_list tbody td { padding: 10px 12px !important; font-size: 0.85rem !important; border-bottom: 1px solid var(--border) !important; }
+
+  /* ── Buttons ── */
+  .button, input[type=submit], input[type=button], .submit-row input,
+  a.button, .addlink, .changelink, .deletelink {
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 0.82rem !important;
+    padding: 7px 16px !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+    border: none !important;
+  }
+  .button, input[type=submit] {
+    background: linear-gradient(135deg, var(--primary), var(--accent)) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(79,70,229,0.25) !important;
+  }
+  .button:hover, input[type=submit]:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(79,70,229,0.35) !important;
+  }
+  .button.default { background: linear-gradient(135deg, var(--primary), #6366f1) !important; }
+  .addlink { background: linear-gradient(135deg, var(--success), #059669) !important; color: #fff !important; }
+  .addlink:hover { color: #fff !important; }
+  .changelink { color: var(--primary) !important; font-weight: 600 !important; }
+  .deletelink { background: linear-gradient(135deg, var(--danger), #dc2626) !important; color: #fff !important; }
+
+  /* ── Submit row ── */
+  .submit-row {
+    background: #f8fafc !important;
+    border-top: 1px solid var(--border) !important;
+    border-radius: 0 0 var(--radius) var(--radius) !important;
+    padding: 12px 16px !important;
+    display: flex !important;
+    gap: 8px !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+  }
+
+  /* ── Filters sidebar ── */
+  #changelist-filter {
+    background: var(--card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+  #changelist-filter h2 {
+    background: linear-gradient(135deg, var(--primary), var(--accent)) !important;
+    color: #fff !important;
+    font-size: 0.7rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    padding: 10px 14px !important;
+    margin: 0 !important;
+  }
+  #changelist-filter h3 {
+    font-size: 0.72rem !important;
+    color: var(--text-muted) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    padding: 10px 14px 4px !important;
+    margin: 0 !important;
+    font-weight: 700 !important;
+    border-top: 1px solid var(--border) !important;
+  }
+  #changelist-filter li { padding: 3px 14px !important; font-size: 0.82rem !important; }
+  #changelist-filter li a { color: var(--primary) !important; text-decoration: none !important; }
+  #changelist-filter li.selected a { color: var(--text) !important; font-weight: 700 !important; }
+
+  /* ── Search bar ── */
+  #toolbar { background: var(--card) !important; border-bottom: 1px solid var(--border) !important; padding: 10px 0 !important; margin-bottom: 12px !important; border-radius: var(--radius) var(--radius) 0 0 !important; }
+  #searchbar { border-radius: 8px !important; border: 1px solid var(--border) !important; padding: 7px 12px !important; font-size: 0.85rem !important; width: 280px !important; }
+  #searchbar:focus { outline: none !important; border-color: var(--primary) !important; box-shadow: 0 0 0 3px rgba(79,70,229,0.15) !important; }
+
+  /* ── Action bar ── */
+  .actions { background: #eef2ff !important; border: 1px solid #c7d2fe !important; border-radius: 8px !important; padding: 8px 12px !important; margin-bottom: 8px !important; }
+  select#action-select { border-radius: 6px !important; border: 1px solid var(--border) !important; padding: 5px 8px !important; font-size: 0.82rem !important; }
+
+  /* ── Pagination ── */
+  .paginator { font-size: 0.82rem !important; color: var(--text-muted) !important; }
+  .paginator a { color: var(--primary) !important; }
+  .paginator .this-page { background: var(--primary) !important; color: #fff !important; border-radius: 6px !important; padding: 2px 8px !important; }
+
+  /* ── Form fields ── */
+  .form-row { border-bottom: 1px solid var(--border) !important; padding: 10px 0 !important; }
+  input[type=text], input[type=password], input[type=email], input[type=url],
+  input[type=number], select, textarea {
+    border-radius: 8px !important;
+    border: 1px solid var(--border) !important;
+    padding: 7px 10px !important;
+    font-size: 0.85rem !important;
+    transition: border-color 0.2s, box-shadow 0.2s !important;
+  }
+  input[type=text]:focus, select:focus, textarea:focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(79,70,229,0.12) !important;
+    outline: none !important;
+  }
+
+  /* ── Messages / Alerts ── */
+  .messagelist { list-style: none !important; padding: 0 !important; margin-bottom: 16px !important; }
+  .messagelist li {
+    padding: 10px 16px !important;
+    border-radius: 8px !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    margin-bottom: 6px !important;
+  }
+  .messagelist .success { background: #d1fae5 !important; color: #065f46 !important; border-left: 4px solid var(--success) !important; }
+  .messagelist .warning { background: #fef3c7 !important; color: #92400e !important; border-left: 4px solid var(--warning) !important; }
+  .messagelist .error   { background: #fee2e2 !important; color: #991b1b !important; border-left: 4px solid var(--danger) !important; }
+
+  /* ── Object tools ── */
+  .object-tools { margin: 0 0 12px !important; }
+  .object-tools li a {
+    background: linear-gradient(135deg, var(--primary), var(--accent)) !important;
+    color: #fff !important;
+    border-radius: 8px !important;
+    padding: 7px 14px !important;
+    font-size: 0.82rem !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+  }
+  .object-tools li a.addlink { background: linear-gradient(135deg, var(--success), #059669) !important; }
+
+  /* ── Dashboard recent actions ── */
+  #recent-actions-module {
+    background: var(--card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    overflow: hidden !important;
+  }
+  #recent-actions-module h2 {
+    background: linear-gradient(90deg, var(--primary), var(--accent)) !important;
+    color: #fff !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    padding: 10px 16px !important;
+    margin: 0 !important;
+  }
+  #recent-actions-module .actionlist { padding: 8px 0 !important; }
+  .actionlist li { padding: 6px 16px !important; font-size: 0.82rem !important; border-bottom: 1px solid var(--border) !important; }
+  .actionlist li:last-child { border-bottom: none !important; }
+
+  /* ── Inline forms ── */
+  .inline-group {
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    overflow: hidden !important;
+    margin-bottom: 1rem !important;
+  }
+
+  /* ── Boolean icons ── */
+  img[src*="icon-yes.svg"] { filter: invert(49%) sepia(98%) saturate(400%) hue-rotate(100deg) brightness(98%) !important; }
+  img[src*="icon-no.svg"]  { filter: invert(35%) sepia(77%) saturate(500%) hue-rotate(330deg) !important; }
+
+  /* ── Responsive ── */
+  @media (max-width: 767px) {
+    #header { height: auto !important; padding: 12px 16px !important; flex-wrap: wrap !important; }
+    #content { padding: 16px !important; }
+  }
+</style>
+{% endblock %}

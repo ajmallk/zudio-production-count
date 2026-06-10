@@ -139,24 +139,37 @@ def create_order(request):
         action = request.POST.get('action', '')
 
         if action == 'add_item':
-            size = int(request.POST.get('size', 0))
-            quantity = int(request.POST.get('quantity', 0))
-            if size in ARTICLE_SIZE_MAP and quantity > 0:
-                # Check duplicate size
+            size_raw     = request.POST.get('size', '0')
+            quantity_raw = request.POST.get('quantity', '0')
+            article      = request.POST.get('article_number', '').strip()
+            name         = request.POST.get('name', '').strip()
+            try:
+                size     = int(size_raw)
+                quantity = int(quantity_raw)
+            except ValueError:
+                messages.error(request, "Invalid size or quantity.")
+                return redirect('create_order')
+
+            # All three are required — no auto-fill fallback
+            if not size or size <= 0:
+                messages.error(request, "Please select a size by clicking a size button.")
+            elif not article:
+                messages.error(request, "Article Number is required — please type it manually.")
+            elif not name:
+                messages.error(request, "Name / Label is required.")
+            elif quantity <= 0:
+                messages.error(request, "Quantity must be at least 1.")
+            else:
                 for item in cart:
                     if item['size'] == size:
                         item['quantity'] = quantity
+                        item['article']  = article
+                        item['name']     = name
                         break
                 else:
-                    cart.append({
-                        'size': size,
-                        'article': ARTICLE_SIZE_MAP[size],
-                        'quantity': quantity
-                    })
+                    cart.append({'size': size, 'article': article, 'name': name, 'quantity': quantity})
                 request.session['order_cart'] = cart
-                messages.success(request, f"Size {size} × {quantity} added to order.")
-            else:
-                messages.error(request, "Invalid size or quantity.")
+                messages.success(request, f'Size {size} — "{name}" x {quantity} added to order.')
 
         elif action == 'remove_item':
             size = int(request.POST.get('size', 0))
@@ -181,6 +194,7 @@ def create_order(request):
         'article_map_json': json.dumps(article_map),
         'size_choices': sorted(ARTICLE_SIZE_MAP.keys()),
     })
+
 
 
 @login_required
@@ -416,6 +430,7 @@ def process_scan(request):
         'message': f'\u2705 +1 Added — Size {qr_obj.size}',
         'size':         qr_obj.size,
         'article':      qr_obj.article_number,
+        'name':         qr_obj.name,
         'batch':        batch_id,
         'size_scanned': size_counts['size_scanned'],
         'size_total':   size_counts['size_total'],
@@ -428,12 +443,20 @@ def process_scan(request):
 @login_required
 def reports(request):
     form = DateRangeFilterForm(request.GET or None)
-    period = request.GET.get('period', 'month')
-    date_from_str = request.GET.get('date_from')
-    date_to_str = request.GET.get('date_to')
+    period        = request.GET.get('period', 'month')
+    date_from_str = request.GET.get('date_from', '')
+    date_to_str   = request.GET.get('date_to', '')
+    time_from_str = request.GET.get('time_from', '')
+    time_to_str   = request.GET.get('time_to', '')
+
+    # Sub-period selectors
+    sel_year  = request.GET.get('sel_year', '')
+    sel_month = request.GET.get('sel_month', '')
+    sel_week  = request.GET.get('sel_week', '')
+    sel_day   = request.GET.get('sel_day', '')
 
     date_from = None
-    date_to = None
+    date_to   = None
     if date_from_str:
         try:
             date_from = datetime.strptime(date_from_str, '%Y-%m-%d').date()
@@ -446,7 +469,21 @@ def reports(request):
             pass
 
     from .reports import build_report_data, get_date_range
-    production_data, stock_data, audit_data, start_dt, end_dt = build_report_data(period, date_from, date_to)
+    (production_data, stock_data, audit_data,
+     start_dt, end_dt,
+     total_records, total_production_count) = build_report_data(
+        period, date_from, date_to,
+        time_from_str or None, time_to_str or None,
+        sel_year=sel_year or None,
+        sel_month=sel_month or None,
+        sel_week=sel_week or None,
+        sel_day=sel_day or None,
+    )
+
+    # Build a list of years for the year dropdown (current year down to 2024)
+    import datetime as _dt
+    current_year = _dt.datetime.now().year
+    year_choices = list(range(current_year, 2023, -1))
 
     return render(request, 'tracker/reports.html', {
         'form': form,
@@ -454,22 +491,41 @@ def reports(request):
         'stock_data': stock_data,
         'audit_data': audit_data[:50],
         'period': period,
-        'date_from': date_from_str or '',
-        'date_to': date_to_str or '',
+        'date_from': date_from_str,
+        'date_to': date_to_str,
+        'time_from': time_from_str,
+        'time_to':   time_to_str,
         'start_dt': start_dt,
-        'end_dt': end_dt,
+        'end_dt':   end_dt,
+        'total_records':          total_records,
+        'total_production_count': total_production_count,
+        # sub-period selectors
+        'sel_year':  sel_year,
+        'sel_month': sel_month,
+        'sel_week':  sel_week,
+        'sel_day':   sel_day,
+        'year_choices': year_choices,
     })
 
 
 @login_required
 def export_excel(request):
-    period = request.GET.get('period', 'month')
+    period        = request.GET.get('period', 'month')
     date_from_str = request.GET.get('date_from')
-    date_to_str = request.GET.get('date_to')
+    date_to_str   = request.GET.get('date_to')
+    time_from_str = request.GET.get('time_from', '') or None
+    time_to_str   = request.GET.get('time_to', '')   or None
+    sel_year      = request.GET.get('sel_year', '')  or None
+    sel_month     = request.GET.get('sel_month', '') or None
+    sel_week      = request.GET.get('sel_week', '')  or None
+    sel_day       = request.GET.get('sel_day', '')   or None
     date_from = datetime.strptime(date_from_str, '%Y-%m-%d').date() if date_from_str else None
-    date_to = datetime.strptime(date_to_str, '%Y-%m-%d').date() if date_to_str else None
+    date_to   = datetime.strptime(date_to_str,   '%Y-%m-%d').date() if date_to_str   else None
 
-    excel_bytes = generate_excel_report(period, date_from, date_to)
+    excel_bytes = generate_excel_report(
+        period, date_from, date_to, time_from_str, time_to_str,
+        sel_year=sel_year, sel_month=sel_month, sel_week=sel_week, sel_day=sel_day,
+    )
     filename = f"VKC_Report_{timezone.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     response = HttpResponse(
         excel_bytes.read(),
@@ -481,13 +537,22 @@ def export_excel(request):
 
 @login_required
 def export_pdf(request):
-    period = request.GET.get('period', 'month')
+    period        = request.GET.get('period', 'month')
     date_from_str = request.GET.get('date_from')
-    date_to_str = request.GET.get('date_to')
+    date_to_str   = request.GET.get('date_to')
+    time_from_str = request.GET.get('time_from', '') or None
+    time_to_str   = request.GET.get('time_to', '')   or None
+    sel_year      = request.GET.get('sel_year', '')  or None
+    sel_month     = request.GET.get('sel_month', '') or None
+    sel_week      = request.GET.get('sel_week', '')  or None
+    sel_day       = request.GET.get('sel_day', '')   or None
     date_from = datetime.strptime(date_from_str, '%Y-%m-%d').date() if date_from_str else None
-    date_to = datetime.strptime(date_to_str, '%Y-%m-%d').date() if date_to_str else None
+    date_to   = datetime.strptime(date_to_str,   '%Y-%m-%d').date() if date_to_str   else None
 
-    pdf_bytes = generate_pdf_report(period, date_from, date_to)
+    pdf_bytes = generate_pdf_report(
+        period, date_from, date_to, time_from_str, time_to_str,
+        sel_year=sel_year, sel_month=sel_month, sel_week=sel_week, sel_day=sel_day,
+    )
     filename = f"VKC_Report_{timezone.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     response = HttpResponse(pdf_bytes.read(), content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'

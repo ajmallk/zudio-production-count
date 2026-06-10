@@ -217,12 +217,16 @@ async function initCameras() {
 
 function startScanner() {
   const deviceId = document.getElementById('camera-select').value;
-  codeReader = new ZXing.BrowserQRCodeReader();
+  // Use BrowserMultiFormatReader with QR-only hint for maximum decode speed
+  const hints = new Map();
+  hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.QR_CODE]);
+  hints.set(ZXing.DecodeHintType.TRY_HARDER, false);
+  codeReader = new ZXing.BrowserMultiFormatReader(hints, 200);  // 200ms decode interval
   scanning = true;
   document.getElementById('scan-line').style.display='block';
   document.getElementById('start-btn').style.display='none';
   document.getElementById('stop-btn').style.display='inline-flex';
-  const constraints = deviceId ? {video:{deviceId:{exact:deviceId}}} : {video:{facingMode:'environment'}};
+  const constraints = deviceId ? {video:{deviceId:{exact:deviceId},width:{ideal:1280},height:{ideal:720}}} : {video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}};
   codeReader.decodeFromConstraints(constraints, 'scanner-video', (result, err) => {
     if (result) {
       const now=Date.now(), qrText=result.getText();
@@ -259,8 +263,9 @@ async function processQR(qrData) {
     const data = await resp.json();
     if (data.status==='success') {
       sess.success++;
-      showResult('success', data.message, `Article: ${data.article} | Batch: ${data.batch}`, qrData, `${data.size_scanned}/${data.size_total} of Size ${data.size} scanned`);
-      addToHistory('success',qrData,`Size ${data.size}`);
+      const namePart = data.name ? ` | ${data.name}` : '';
+      showResult('success', data.message, `Article: ${data.article}${namePart} | Batch: ${data.batch}`, qrData, `${data.size_scanned}/${data.size_total} of Size ${data.size} scanned`);
+      addToHistory('success',qrData,`Size ${data.size}${namePart}`);
       playBeep(); vibrate([100]);
     } else if (data.status==='already_scanned') {
       sess.duplicate++;

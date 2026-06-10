@@ -2,31 +2,114 @@
 {% block title %}Reports — VKC QR Tracker{% endblock %}
 {% block page_title %}<i class="bi bi-bar-chart me-2" style="color:var(--primary);"></i>Production Reports{% endblock %}
 
+{% block extra_head %}
+<style>
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.summary-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+.summary-card .val { font-size: 2rem; font-weight: 800; }
+.summary-card .lbl { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-top: 2px; }
+
+/* Sub-selector panels — hidden by default */
+.sub-selector { display: none; }
+.sub-selector.visible { display: flex; align-items: flex-end; gap: 0.75rem; flex-wrap: wrap; }
+
+/* Custom range block */
+.datetime-range-fields { display:none; }
+.datetime-range-fields.visible { display:flex; flex-wrap:wrap; gap:0.75rem; }
+
+/* Highlighted Orders card */
+.orders-highlight {
+  background: linear-gradient(135deg, var(--primary-light), #e0e7ff);
+  border: 2px solid var(--primary);
+}
+.orders-highlight .val { color: var(--primary); }
+</style>
+{% endblock %}
+
 {% block content %}
 
 <!-- Filter Bar -->
 <div class="card-light mb-4">
   <form method="get" id="filter-form">
     <div class="row g-3 align-items-end">
-      <div class="col-sm-6 col-md-3">
+
+      <!-- Period selector -->
+      <div class="col-sm-6 col-md-2">
         <label class="form-label">Period</label>
-        <select name="period" id="period-select" class="form-select" onchange="toggleCustomRange()">
-          <option value="day"    {% if period == 'day'    %}selected{% endif %}>Today</option>
-          <option value="week"   {% if period == 'week'   %}selected{% endif %}>This Week</option>
-          <option value="month"  {% if period == 'month'  %}selected{% endif %}>This Month</option>
-          <option value="year"   {% if period == 'year'   %}selected{% endif %}>This Year</option>
+        <select name="period" id="period-select" class="form-select" onchange="onPeriodChange()">
+          <option value="year"   {% if period == 'year'   %}selected{% endif %}>Year</option>
+          <option value="month"  {% if period == 'month'  %}selected{% endif %}>Month</option>
+          <option value="week"   {% if period == 'week'   %}selected{% endif %}>Week</option>
+          <option value="day"    {% if period == 'day'    %}selected{% endif %}>Day</option>
           <option value="custom" {% if period == 'custom' %}selected{% endif %}>Custom Range</option>
         </select>
       </div>
-      <div class="col-sm-6 col-md-3 custom-range-field" {% if period != 'custom' %}style="display:none;"{% endif %}>
-        <label class="form-label">From</label>
-        <input type="date" name="date_from" class="form-control" value="{{ date_from }}" />
+
+      <!-- Year sub-selector -->
+      <div id="sub-year" class="col-sm-6 col-md-2 sub-selector {% if period == 'year' %}visible{% endif %}">
+        <label class="form-label">Select Year</label>
+        <select name="sel_year" class="form-select">
+          {% for y in year_choices %}
+          <option value="{{ y }}" {% if sel_year == y|stringformat:"s" %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
       </div>
-      <div class="col-sm-6 col-md-3 custom-range-field" {% if period != 'custom' %}style="display:none;"{% endif %}>
-        <label class="form-label">To</label>
-        <input type="date" name="date_to" class="form-control" value="{{ date_to }}" />
+
+      <!-- Month sub-selector -->
+      <div id="sub-month" class="col-sm-6 col-md-2 sub-selector {% if period == 'month' %}visible{% endif %}">
+        <label class="form-label">Select Month</label>
+        <input type="month" name="sel_month" class="form-control" value="{{ sel_month }}" />
       </div>
-      <div class="col-sm-6 col-md-3">
+
+      <!-- Week sub-selector -->
+      <div id="sub-week" class="col-sm-6 col-md-2 sub-selector {% if period == 'week' %}visible{% endif %}">
+        <label class="form-label">Select Week</label>
+        <input type="week" name="sel_week" class="form-control" value="{{ sel_week }}" />
+      </div>
+
+      <!-- Day sub-selector -->
+      <div id="sub-day" class="col-sm-6 col-md-2 sub-selector {% if period == 'day' %}visible{% endif %}">
+        <label class="form-label">Select Day</label>
+        <input type="date" name="sel_day" class="form-control" value="{{ sel_day }}" />
+      </div>
+
+      <!-- Custom date+time range block -->
+      <div id="custom-range-block"
+           class="col-12 {% if period != 'custom' %}d-none{% endif %}"
+           style="padding-top:0;">
+        <div class="row g-2 align-items-end">
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label">From Date</label>
+            <input type="date" name="date_from" class="form-control" value="{{ date_from }}" />
+          </div>
+          <div class="col-sm-6 col-md-2">
+            <label class="form-label">From Time</label>
+            <input type="time" name="time_from" class="form-control" value="{{ time_from }}" placeholder="00:00" />
+          </div>
+          <div class="col-sm-6 col-md-3">
+            <label class="form-label">To Date</label>
+            <input type="date" name="date_to" class="form-control" value="{{ date_to }}" />
+          </div>
+          <div class="col-sm-6 col-md-2">
+            <label class="form-label">To Time</label>
+            <input type="time" name="time_to" class="form-control" value="{{ time_to }}" placeholder="23:59" />
+          </div>
+        </div>
+      </div>
+
+      <div class="col-sm-6 col-md-2">
         <button type="submit" class="btn btn-primary-custom w-100">
           <i class="bi bi-search me-1"></i>Apply Filter
         </button>
@@ -35,20 +118,40 @@
   </form>
 </div>
 
+<!-- Summary Cards -->
+<div class="summary-grid">
+  <!-- Total Orders Processed (prominent) -->
+  <div class="summary-card orders-highlight">
+    <div class="val">{{ total_production_count }}</div>
+    <div class="lbl"><i class="bi bi-box-seam me-1"></i>Total Orders Processed</div>
+  </div>
+  <div class="summary-card">
+    <div class="val" style="color:var(--primary);">{{ total_production_count }}</div>
+    <div class="lbl">QR Codes Produced</div>
+  </div>
+  <div class="summary-card">
+    <div class="val" style="color:var(--success);">{{ total_records }}</div>
+    <div class="lbl">Record Groups Found</div>
+  </div>
+  <div class="summary-card" style="grid-column:span 2;min-width:0;">
+    <div style="font-size:0.85rem;font-weight:700;color:var(--text-primary);">
+      <i class="bi bi-calendar-range me-1" style="color:var(--primary);"></i>
+      {{ start_dt|date:"d M Y H:i" }} &mdash; {{ end_dt|date:"d M Y H:i" }}
+    </div>
+    <div class="lbl">Report Period</div>
+  </div>
+</div>
+
 <!-- Export Buttons -->
 <div class="d-flex gap-2 mb-4 flex-wrap align-items-center">
-  <a href="{% url 'export_excel' %}?period={{ period }}&date_from={{ date_from }}&date_to={{ date_to }}"
+  <a href="{% url 'export_excel' %}?period={{ period }}&date_from={{ date_from }}&date_to={{ date_to }}&time_from={{ time_from }}&time_to={{ time_to }}&sel_year={{ sel_year }}&sel_month={{ sel_month }}&sel_week={{ sel_week }}&sel_day={{ sel_day }}"
      class="btn" style="background:var(--success-light);border:1px solid #6ee7b7;color:var(--success);border-radius:var(--radius-sm);font-weight:600;padding:0.55rem 1.2rem;">
     <i class="bi bi-file-earmark-excel me-2"></i>Export Excel
   </a>
-  <a href="{% url 'export_pdf' %}?period={{ period }}&date_from={{ date_from }}&date_to={{ date_to }}"
+  <a href="{% url 'export_pdf' %}?period={{ period }}&date_from={{ date_from }}&date_to={{ date_to }}&time_from={{ time_from }}&time_to={{ time_to }}&sel_year={{ sel_year }}&sel_month={{ sel_month }}&sel_week={{ sel_week }}&sel_day={{ sel_day }}"
      class="btn" style="background:var(--danger-light);border:1px solid #fca5a5;color:var(--danger);border-radius:var(--radius-sm);font-weight:600;padding:0.55rem 1.2rem;">
     <i class="bi bi-file-earmark-pdf me-2"></i>Export PDF
   </a>
-  <div class="ms-auto" style="font-size:0.8rem;color:var(--text-muted);display:flex;align-items:center;gap:4px;">
-    <i class="bi bi-calendar3"></i>
-    {{ start_dt|date:"d M Y" }} — {{ end_dt|date:"d M Y" }}
-  </div>
 </div>
 
 <!-- Tabs -->
@@ -73,6 +176,16 @@
 
   <!-- Production -->
   <div id="pane-production" class="report-pane p-0">
+    <!-- Orders summary banner inside the Production pane -->
+    <div style="padding:0.6rem 1.5rem;background:linear-gradient(90deg,var(--primary-light),#e0e7ff);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+      <span style="font-size:0.82rem;font-weight:700;color:var(--primary);">
+        <i class="bi bi-box-seam me-1"></i>
+        Total Orders Processed this period: <strong style="font-size:1.05rem;">{{ total_production_count }}</strong>
+      </span>
+      <span style="font-size:0.78rem;color:var(--text-muted);">
+        ({{ total_records }} record group{{ total_records|pluralize }})
+      </span>
+    </div>
     {% if production_data %}
     <div class="table-responsive">
       <table class="table table-light-custom mb-0" style="margin:0;">
@@ -177,19 +290,43 @@
 </div>
 
 <script>
-function toggleCustomRange() {
-  const p=document.getElementById('period-select').value;
-  document.querySelectorAll('.custom-range-field').forEach(f=>{f.style.display=p==='custom'?'block':'none';});
+const SUB_IDS = ['year','month','week','day'];
+
+function onPeriodChange() {
+  const p = document.getElementById('period-select').value;
+
+  // Show/hide sub-selectors
+  SUB_IDS.forEach(function(id) {
+    var el = document.getElementById('sub-' + id);
+    if (el) {
+      el.style.display = (p === id) ? 'flex' : 'none';
+    }
+  });
+
+  // Show/hide custom date-range block
+  document.getElementById('custom-range-block').classList.toggle('d-none', p !== 'custom');
 }
+
+// Run on load to ensure correct initial state (handles back-button / page reload)
+(function() {
+  const p = document.getElementById('period-select').value;
+  SUB_IDS.forEach(function(id) {
+    var el = document.getElementById('sub-' + id);
+    if (el) {
+      el.style.display = (p === id) ? 'flex' : 'none';
+    }
+  });
+  document.getElementById('custom-range-block').classList.toggle('d-none', p !== 'custom');
+})();
+
 function showTab(name) {
   ['production','stock','audit'].forEach(t => {
-    document.getElementById('pane-'+t).style.display = t===name?'block':'none';
-    const tab=document.getElementById('tab-'+t);
+    document.getElementById('pane-'+t).style.display = t===name ? 'block' : 'none';
+    const tab = document.getElementById('tab-'+t);
     if (t===name) { tab.style.color='var(--primary)'; tab.style.borderBottom='2px solid var(--primary)'; }
     else          { tab.style.color='var(--text-muted)'; tab.style.borderBottom='2px solid transparent'; }
   });
 }
-// Apply gradient colours to completion bars based on data-pct value
 document.querySelectorAll('.completion-bar').forEach(function(bar) {
   var pct = parseInt(bar.dataset.pct, 10);
   if (pct >= 80)      bar.style.background = 'linear-gradient(90deg,var(--success),#10b981)';

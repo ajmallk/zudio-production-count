@@ -48,6 +48,7 @@ class QRCode(models.Model):
     qr_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     batch = models.ForeignKey(ProductionBatch, on_delete=models.CASCADE, related_name='qrcodes')
     article_number = models.CharField(max_length=20)
+    name = models.CharField(max_length=100, blank=True)  # Custom label/name for this QR
     size = models.IntegerField()
     qr_data = models.TextField()  # Full QR string: FT-{article}-{size}-{uuid}-{timestamp}
     qr_image = models.ImageField(upload_to='qrcodes/', blank=True, null=True)
@@ -57,7 +58,8 @@ class QRCode(models.Model):
     scanned_by_device = models.CharField(max_length=200, blank=True)
 
     def __str__(self):
-        return f"QR {self.qr_id} | Art:{self.article_number} | Size:{self.size}"
+        label = f" | {self.name}" if self.name else ""
+        return f"QR {self.qr_id} | Art:{self.article_number} | Size:{self.size}{label}"
 
     class Meta:
         ordering = ['-created_at']
@@ -100,10 +102,12 @@ class OrderItem(models.Model):
     batch = models.ForeignKey(ProductionBatch, on_delete=models.CASCADE, related_name='order_items')
     size = models.IntegerField()
     article_number = models.CharField(max_length=20)
+    name = models.CharField(max_length=100, blank=True)  # Custom name/label
     quantity = models.PositiveIntegerField()
 
     def __str__(self):
-        return f"Size {self.size} x {self.quantity}"
+        label = f" [{self.name}]" if self.name else ""
+        return f"Size {self.size}{label} x {self.quantity}"
 
     class Meta:
         unique_together = ('batch', 'size')
