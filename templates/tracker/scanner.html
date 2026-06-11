@@ -371,6 +371,39 @@ async function syncOfflineQueue() {
   } catch(e){}
 }
 
+// Hardware Scanner Support (USB/Bluetooth)
+let hwScanBuffer = '';
+let hwScanTimeout = null;
+const HW_SCAN_TIMEOUT_MS = 50; // Max time between keystrokes for hardware scanner
+
+document.addEventListener('keydown', function(e) {
+  // Ignore if typing in an input field (except the manual input field we want to keep fast-scan functionality for)
+  if (e.target.tagName === 'INPUT' && e.target.id !== 'manual-qr-input') return;
+  if (e.target.tagName === 'TEXTAREA') return;
+
+  if (e.key === 'Enter') {
+    if (hwScanBuffer.length > 0) {
+      const qrData = hwScanBuffer.trim();
+      if (qrData) {
+        processQR(qrData);
+        // If they were focused on the manual input, clear it
+        const manualInput = document.getElementById('manual-qr-input');
+        if (manualInput && document.activeElement === manualInput) {
+            manualInput.value = '';
+        }
+      }
+      hwScanBuffer = '';
+      if (hwScanTimeout) clearTimeout(hwScanTimeout);
+    }
+  } else if (e.key.length === 1) { // Printable characters
+    hwScanBuffer += e.key;
+    if (hwScanTimeout) clearTimeout(hwScanTimeout);
+    hwScanTimeout = setTimeout(() => {
+      hwScanBuffer = ''; // Reset if typing is too slow (human)
+    }, HW_SCAN_TIMEOUT_MS);
+  }
+});
+
 initCameras();
 if (offlineQueue.length) document.getElementById('offline-count').textContent=offlineQueue.length;
 </script>

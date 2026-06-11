@@ -398,16 +398,26 @@ def generate_pdf_report(period='month', date_from=None, date_to=None,
     return output
 
 
-def generate_batch_pdf(batch):
+def generate_batch_pdf(batch, width_mm=None, height_mm=None):
     """Generate printable PDF sheet with all QR codes for a batch"""
     from .models import QRCode
-    from reportlab.platypus import Image as RLImage
+    from reportlab.platypus import Image as RLImage, PageBreak
+    from reportlab.lib.units import mm
 
     qr_codes = QRCode.objects.filter(batch=batch).order_by('size')
     output   = io.BytesIO()
-    doc = SimpleDocTemplate(output, pagesize=A4,
-                            rightMargin=1*cm, leftMargin=1*cm,
-                            topMargin=1.5*cm, bottomMargin=1*cm)
+    
+    is_thermal = width_mm and height_mm
+    
+    if is_thermal:
+        page_size = (width_mm * mm, height_mm * mm)
+        doc = SimpleDocTemplate(output, pagesize=page_size,
+                                rightMargin=0, leftMargin=0,
+                                topMargin=0, bottomMargin=0)
+    else:
+        doc = SimpleDocTemplate(output, pagesize=A4,
+                                rightMargin=1*cm, leftMargin=1*cm,
+                                topMargin=1.5*cm, bottomMargin=1*cm)
 
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle('T', fontSize=14, fontName='Helvetica-Bold',
@@ -418,65 +428,96 @@ def generate_batch_pdf(batch):
                                   alignment=TA_CENTER, spaceAfter=12)
 
     story = []
-    story.append(Paragraph("VKC Footwear — QR Code Sheet", title_style))
-    story.append(Paragraph(
-        f"Batch: {batch.batch_id} | Generated: {batch.created_at.strftime('%d %b %Y %H:%M')}",
-        info_style
-    ))
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e94560')))
-    story.append(Spacer(1, 8))
-
-    # Build grid: 4 per row
-    QR_SIZE      = 4.5 * cm
-    items_per_row = 4
-    row_data      = []
-    current_row   = []
+    
+    if not is_thermal:
+        story.append(Paragraph("VKC Footwear — QR Code Sheet", title_style))
+        story.append(Paragraph(
+            f"Batch: {batch.batch_id} | Generated: {batch.created_at.strftime('%d %b %Y %H:%M')}",
+            info_style
+        ))
+        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#e94560')))
+        story.append(Spacer(1, 8))
 
     name_style_pdf = ParagraphStyle(
         'nl', fontSize=10, fontName='Helvetica-Bold',
         textColor=colors.HexColor('#4f46e5'), alignment=TA_CENTER
     )
 
-    for qr in qr_codes:
-        if qr.qr_image and qr.qr_image.path and __import__('os').path.exists(qr.qr_image.path):
-            cell_content = [
-                RLImage(qr.qr_image.path, width=QR_SIZE, height=QR_SIZE),
-                Paragraph(f"<b>Size {qr.size}</b>",
-                          ParagraphStyle('c', fontSize=8, alignment=TA_CENTER)),
-                Paragraph(qr.article_number,
-                          ParagraphStyle('c2', fontSize=6, textColor=colors.grey, alignment=TA_CENTER)),
-            ]
-            # Name — large and prominent in the print layout
-            if qr.name:
-                cell_content.append(
-                    Paragraph(qr.name,
-                              name_style_pdf)
-                )
-        else:
-            cell_content = [Paragraph(f"QR\nSize {qr.size}",
-                                       ParagraphStyle('c', fontSize=8, alignment=TA_CENTER))]
+    if is_thermal:
+        # Thermal mode: 1 QR per page, exact size
+        # Calculate max QR size that fits while leaving some margin
+        margin = 2 * mm
+        avail_w = (width_mm * mm) - margin*2
+        avail_h = (height_mm * mm) - margin*2
+        # Deduct some space for text in thermal mode
+        text_space = 8 * mm # approx space for text
+        QR_SIZE = min(avail_w, avail_h - text_space)
+        if QR_SIZE < 10*mm:
+             QR_SIZE = 10*mm
+             
+        for qr in qr_codes:
+            if qr.qr_image and qr.qr_image.path and __import__('os').path.exists(qr.qr_image.path):
+                img = RLImage(qr.qr_image.path, width=QR_SIZE, height=QR_SIZE)
+                # Build a single column table for the page
+                cell_content = [
+                    Spacer(1, margin),
+                    img
+                ]
+                story.append(Table([[c] for c in cell_content], colWidths=[width_mm * mm], style=[
+                    ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                    ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                ]))
+                story.append(PageBreak())
+            else:
+                story.append(Paragraph(f"QR Size {qr.size}", ParagraphStyle('c', alignment=TA_CENTER)))
+                story.append(PageBreak())
+    else:
+        # Build grid: 4 per row
+        QR_SIZE      = 4.5 * cm
+        items_per_row = 4
+        row_data      = []
+        current_row   = []
 
-        current_row.append(cell_content)
-        if len(current_row) == items_per_row:
+        for qr in qr_codes:
+            if qr.qr_image and qr.qr_image.path and __import__('os').path.exists(qr.qr_image.path):
+                cell_content = [
+                    RLImage(qr.qr_image.path, width=QR_SIZE, height=QR_SIZE),
+                    Paragraph(f"<b>Size {qr.size}</b>",
+                              ParagraphStyle('c', fontSize=8, alignment=TA_CENTER)),
+                    Paragraph(qr.article_number,
+                              ParagraphStyle('c2', fontSize=6, textColor=colors.grey, alignment=TA_CENTER)),
+                ]
+                # Name — large and prominent in the print layout
+                if qr.name:
+                    cell_content.append(
+                        Paragraph(qr.name,
+                                  name_style_pdf)
+                    )
+            else:
+                cell_content = [Paragraph(f"QR\nSize {qr.size}",
+                                           ParagraphStyle('c', fontSize=8, alignment=TA_CENTER))]
+
+            current_row.append(cell_content)
+            if len(current_row) == items_per_row:
+                row_data.append(current_row)
+                current_row = []
+
+        if current_row:
+            while len(current_row) < items_per_row:
+                current_row.append([Spacer(1, 1)])
             row_data.append(current_row)
-            current_row = []
 
-    if current_row:
-        while len(current_row) < items_per_row:
-            current_row.append([Spacer(1, 1)])
-        row_data.append(current_row)
-
-    if row_data:
-        col_w = [QR_SIZE + 0.5*cm] * items_per_row
-        row_h = [QR_SIZE + 2.0*cm] * len(row_data)   # extra height for name row
-        t = Table(row_data, colWidths=col_w, rowHeights=row_h)
-        t.setStyle(TableStyle([
-            ('ALIGN',  (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('GRID',   (0, 0), (-1, -1), 0.5, colors.HexColor('#dddddd')),
-            ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
-        ]))
-        story.append(t)
+        if row_data:
+            col_w = [QR_SIZE + 0.5*cm] * items_per_row
+            row_h = [QR_SIZE + 2.0*cm] * len(row_data)   # extra height for name row
+            t = Table(row_data, colWidths=col_w, rowHeights=row_h)
+            t.setStyle(TableStyle([
+                ('ALIGN',  (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID',   (0, 0), (-1, -1), 0.5, colors.HexColor('#dddddd')),
+                ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+            ]))
+            story.append(t)
 
     doc.build(story)
     output.seek(0)

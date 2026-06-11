@@ -290,7 +290,20 @@ def batch_detail(request, batch_id):
 def print_batch(request, batch_id):
     """Download printable PDF of QR codes"""
     batch = get_object_or_404(ProductionBatch, id=batch_id)
-    pdf_bytes = generate_batch_pdf(batch)
+    
+    width_mm = request.GET.get('width')
+    height_mm = request.GET.get('height')
+    
+    w = None
+    h = None
+    if width_mm and height_mm:
+        try:
+            w = float(width_mm)
+            h = float(height_mm)
+        except ValueError:
+            pass
+
+    pdf_bytes = generate_batch_pdf(batch, width_mm=w, height_mm=h)
 
     # Mark as printed
     if not batch.is_printed:
